@@ -141,6 +141,7 @@ def test_model_parameters(test_params, expected_params):
               weight_decay=0.0,
               momentum=None,
               clip_gradient=1.0,
+              gradient_clipping_type='abs',
               learning_rate_scheduler_type='plateau-reduce',
               learning_rate_reduce_factor=0.5,
               learning_rate_reduce_num_not_improved=3,

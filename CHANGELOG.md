@@ -10,6 +10,10 @@ Note that Sockeye has checks in place to not translate with an old model that wa
 
 Each version section may have have subsections for: _Added_, _Changed_, _Removed_, _Deprecated_, and _Fixed_.
 
+## [1.13.2]
+### Added
+ - Gradient norm clipping (`--gradient-clipping-type`) and monitoring.
+
 ## [1.13.1]
 ### Added
 - Added chrF metric
