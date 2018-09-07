@@ -33,6 +33,14 @@ ENCODER_DECODER_SETTINGS = [
      " --decode-and-evaluate 0",
      "--beam-size 2 --softmax-temperature 0.01",
      True, False, False),
+# "Vanilla" LSTM encoder-decoder with attention, higher nbeest size
+    ("--encoder rnn --decoder rnn --num-layers 1 --rnn-cell-type lstm --rnn-num-hidden 8 --num-embed 4 "
+     " --rnn-attention-type mlp"
+     " --rnn-attention-num-hidden 8 --batch-size 2 --loss cross-entropy --optimized-metric perplexity --max-updates 2"
+     " --checkpoint-frequency 2 --optimizer adam --initial-learning-rate 0.01 --batch-type sentence "
+     " --decode-and-evaluate 0",
+     "--beam-size 2 --softmax-temperature 0.01 --nbest-size 2",
+     True, False, False),
     # "Kitchen sink" LSTM encoder-decoder with attention
     ("--encoder rnn --decoder rnn --num-layers 3:2 --rnn-cell-type lstm --rnn-num-hidden 8"
      " --rnn-residual-connections"
@@ -81,7 +89,7 @@ ENCODER_DECODER_SETTINGS = [
      " --weight-init-scale=3.0 --weight-init-xavier-factor-type=avg --embed-weight-init=normal"
      " --batch-size 2 --max-updates 2 --batch-type sentence --decode-and-evaluate 0"
      " --checkpoint-frequency 2 --optimizer adam --initial-learning-rate 0.01",
-     "--beam-size 2",
+     "--beam-size 2 --nbest-size 2",
      True, False, False),
     # Full transformer with source factor
     ("--encoder transformer --decoder transformer"
@@ -108,7 +116,7 @@ ENCODER_DECODER_SETTINGS = [
      " --batch-size 2 --batch-type sentence"
      " --loss cross-entropy --optimized-metric perplexity --max-updates 2"
      " --checkpoint-frequency 2 --optimizer adam --initial-learning-rate 0.01 --lhuc all",
-     "--beam-size 2",
+     "--beam-size 2 --nbest-size 2",
     True, False, False),
     # Full transformer with LHUC
     ("--encoder transformer --decoder transformer"

@@ -52,6 +52,14 @@ def run_translate(args: argparse.Namespace):
     if args.checkpoints is not None:
         check_condition(len(args.checkpoints) == len(args.models), "must provide checkpoints for each model")
 
+    if args.nbest_size > 1:
+        check_condition(args.beam_size >= args.nbest_size,
+                        "Size of nbest list (--nbest-size) must be smaller or equal to beam size (--beam-size).")
+        if args.output_type not in C.OUTPUT_HANDLERS_NBEST:
+            logger.warning("For nbest translation, output handler must be one of %s, overriding option --output-type to '%s'.",
+                       C.OUTPUT_HANDLERS_NBEST, C.OUTPUT_HANDLER_NBEST)
+        args.output_type = C.OUTPUT_HANDLER_NBEST
+
     log_basic_info(args)
 
     output_handler = get_output_handler(args.output_type,
@@ -96,6 +104,7 @@ def run_translate(args: argparse.Namespace):
                                                                                  args.length_penalty_beta),
                                           beam_prune=args.beam_prune,
                                           beam_search_stop=args.beam_search_stop,
+                                          nbest_size=args.nbest_size,
                                           models=models,
                                           source_vocabs=source_vocabs,
                                           target_vocab=target_vocab,
