@@ -1077,6 +1077,25 @@ def add_training_args(params):
                               action='store_true',
                               help="Do not perform any actual training, but print statistics about the model"
                               " and mode of operation.")
+    
+    train_params.add_argument('--no-shuffle',
+                              action='store_true',
+                              help="Do not shuffle training data.")
+    
+    train_params.add_argument('--use-spm',
+                              action='store_true',
+                              help="Use sentencepiece for segmentation.")    
+    train_params.add_argument('--spm-alpha',
+                              type=float,
+                              default=0.1,
+                              help="Alpha parameter for sentencepiece sampling.")
+    train_params.add_argument('--spm-nbest-size',
+                              type=int,
+                              default=64,
+                              help="Nbest size for sentencepiece sampling.")
+    train_params.add_argument('--spm-model',
+                              type=regular_file(),
+                              help="Sentencepiece model.")
 
 
 def add_train_cli_args(params):

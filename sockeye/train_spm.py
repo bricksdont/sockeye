@@ -39,6 +39,7 @@ from . import constants as C
 from . import convolution
 from . import coverage
 from . import data_io
+from . import data_io_spm
 from . import decoder
 from . import encoder
 from . import initializer
@@ -338,7 +339,7 @@ def create_data_iters_and_vocabs(args: argparse.Namespace,
                         'Training and validation data must have the same number of factors, but found %d and %d.' % (
                             len(source_vocabs), len(validation_sources)))
 
-        train_iter, validation_iter, config_data, data_info = data_io.get_training_data_iters(
+        train_iter, validation_iter, config_data, data_info = data_io_spm.get_training_data_iters(
             sources=sources,
             target=os.path.abspath(args.target),
             validation_sources=validation_sources,
@@ -356,6 +357,11 @@ def create_data_iters_and_vocabs(args: argparse.Namespace,
             max_seq_len_target=max_seq_len_target,
             bucketing=not args.no_bucketing,
             bucket_width=args.bucket_width,
+            use_spm=args.use_spm,
+            spm_alpha=args.spm_alpha,
+            spm_nbest_size=args.spm_nbest_size,
+            spm_model=args.spm_model,
+            output_folder=output_folder,
             permute=not args.no_shuffle)
 
         data_info_fname = os.path.join(output_folder, C.DATA_INFO)
