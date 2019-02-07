@@ -27,10 +27,12 @@ from typing import Any, cast, Dict, Iterator, Iterable, List, Optional, Sequence
 
 import mxnet as mx
 import numpy as np
+import sentencepiece as spm
 
 from . import config
 from . import constants as C
 from . import vocab
+from . import spm_sample
 from .utils import check_condition, smart_open, get_tokens, OnlineMeanAndVariance
 
 logger = logging.getLogger(__name__)
@@ -781,6 +783,11 @@ def get_training_data_iters(sources: List[str],
                             max_seq_len_target: int,
                             bucketing: bool,
                             bucket_width: int,
+                            use_spm: bool,
+                            spm_alpha: float,
+                            spm_nbest_size: int,
+                            spm_model: str,
+                            output_folder: str,
                             permute: bool = True,
                             allow_empty: bool = False) -> Tuple['BaseParallelSampleIter',
                                                            Optional['BaseParallelSampleIter'],
@@ -811,6 +818,29 @@ def get_training_data_iters(sources: List[str],
     logger.info("===============================")
     logger.info("Creating training data iterator")
     logger.info("===============================")
+    
+    if use_spm:
+        sentencepiece_sampler = spm_sample.sentencepieceSampler(
+                                spm_alpha=spm_alpha,
+                                spm_nbest_size=spm_nbest_size,
+                                spm_model=spm_model,
+                                source_vocabs=source_vocabs,
+                                target_vocab=target_vocab,
+                                output_folder=output_folder,
+                                max_seq_len_source=max_seq_len_source,
+                                max_seq_len_target=max_seq_len_target,
+                                original_sources=sources,
+                                original_target=target,
+                                bucketing=bucketing,
+                                bucket_width=bucket_width,
+                                batch_size=batch_size,
+                                batch_by_words=batch_by_words,
+                                batch_num_devices=batch_num_devices,
+                                fill_up=fill_up,
+                                permute=permute
+                                )
+        sources[0], target = sentencepiece_sampler.sample()
+    
     # Pass 1: get target/source length ratios.
     length_statistics = analyze_sequence_lengths(sources, target, source_vocabs, target_vocab,
                                                  max_seq_len_source, max_seq_len_target)
@@ -860,16 +890,24 @@ def get_training_data_iters(sources: List[str],
                              max_seq_len_target=max_seq_len_target,
                              num_source_factors=len(sources),
                              source_with_eos=True)
+    
+    
 
     train_iter = ParallelSampleIter(data=training_data,
                                     buckets=buckets,
                                     batch_size=batch_size,
                                     bucket_batch_sizes=bucket_batch_sizes,
                                     num_factors=len(sources),
-                                    permute=permute)
+                                    permute=permute,
+                                    use_spm=use_spm,
+                                    sentencepiece_sampler=sentencepiece_sampler)
 
     validation_iter = None
     if validation_sources is not None and validation_target is not None:
+        if use_spm:
+            # one best segmentation for validation set
+            validation_sources[0], validation_target = sentencepiece_sampler.split_validation(validation_sources, validation_target)
+            
         validation_iter = get_validation_data_iter(data_loader=data_loader,
                                                    validation_sources=validation_sources,
                                                    validation_target=validation_target,
@@ -1060,6 +1098,21 @@ def ids2tokens(token_ids: Iterable[int],
     """
     tokens = (vocab_inv[token] for token in token_ids)
     return (tok for token_id, tok in zip(token_ids, tokens) if token_id not in exclude_set)
+
+def ids2tokens_spm(token_ids: Iterable[int],
+               vocab_inv: Dict[int, str],
+               exclude_set: Set[int]) -> Iterator[str]:
+    """
+    Transforms a list of token IDs into a list of words, excluding any IDs in `exclude_set`.
+
+    :param token_ids: The list of token IDs.
+    :param vocab_inv: The inverse vocabulary.
+    :param exclude_set: The list of token IDs to exclude.
+    :return: The list of words.
+    """
+    tokens = (vocab_inv[token] for token in token_ids)
+    return [tok for token_id, tok in zip(token_ids, tokens) if token_id not in exclude_set]
+
 
 
 class SequenceReader(Iterable):
@@ -1587,8 +1640,8 @@ class ShardedParallelSampleIter(BaseParallelSampleIter):
             self.shard_index = pickle.load(fp)
         self._load_shard()
         self.shard_iter.load_state(fname + ".sharditer")
-
-
+     
+            
 class ParallelSampleIter(BaseParallelSampleIter):
     """
     Data iterator on a bucketed ParallelDataSet. Shuffles data at every reset and supports saving and loading the
@@ -1605,7 +1658,9 @@ class ParallelSampleIter(BaseParallelSampleIter):
                  label_name=C.TARGET_LABEL_NAME,
                  num_factors: int = 1,
                  permute: bool = True,
-                 dtype='float32') -> None:
+                 dtype='float32',
+                 use_spm: Optional[bool] = False,
+                 sentencepiece_sampler: Optional[spm_sample.sentencepieceSampler] = None) -> None:
         super().__init__(buckets=buckets, batch_size=batch_size, bucket_batch_sizes=bucket_batch_sizes,
                          source_data_name=source_data_name, target_data_name=target_data_name,
                          label_name=label_name, num_factors=num_factors, permute=permute, dtype=dtype)
@@ -1623,14 +1678,21 @@ class ParallelSampleIter(BaseParallelSampleIter):
                                           for i in range(len(self.data))]
         self.data_permutations = [mx.nd.arange(0, max(1, self.data.source[i].shape[0]))
                                   for i in range(len(self.data))]
-
+        self.use_spm=use_spm
+        self.spm_sampler= sentencepiece_sampler
+        self.first_epoch=True
         self.reset()
+        self.first_epoch=False
 
     def reset(self):
         """
         Resets and reshuffles the data.
         """
         self.curr_batch_index = 0
+        if self.use_spm and not self.first_epoch:
+            logger.info("New epoch, sampling with sentencepiece")
+            self = self.spm_sampler.resample()
+        
         if self.permute:
             # shuffle batch start indices
             random.shuffle(self.batch_indices)
