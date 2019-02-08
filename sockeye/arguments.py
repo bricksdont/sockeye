@@ -1078,26 +1078,29 @@ def add_training_args(params):
                               help="Do not perform any actual training, but print statistics about the model"
                               " and mode of operation.")
     
-    train_params.add_argument('--no-shuffle',
-                              action='store_true',
-                              help="Do not shuffle training data.")
+
     
-    train_params.add_argument('--use-spm',
+def add_sentencepiece_args(params):
+    spm_params = params.add_argument_group("Sentencepiece parameters")    
+    spm_params.add_argument('--use-spm',
                               action='store_true',
                               default=False,
-                              help="Use sentencepiece for segmentation. Note: training and dev set should be full text (tokenized, truecased or raw, depending on the sentencepiece language model). Full vocabularies are required, otherwise we might end up with incomplete vocabs.")    
-    train_params.add_argument('--spm-alpha',
+                              help="Use sentencepiece for segmentation. Note: training and dev set should be full text (tokenized, truecased or raw, depending on the sentencepiece language model). Requires --source-vocab and --target-vocab.")    
+    spm_params.add_argument('--spm-alpha',
                               type=float,
                               default=0.1,
                               help="Alpha parameter for sentencepiece sampling.")
-    train_params.add_argument('--spm-nbest-size',
+    spm_params.add_argument('--spm-nbest-size',
                               type=int,
                               default=64,
                               help="Nbest size for sentencepiece sampling.")
-    train_params.add_argument('--spm-model',
+    spm_params.add_argument('--spm-model',
                               type=regular_file(),
                               default=None,
                               help="Sentencepiece model.")
+    spm_params.add_argument('--no-shuffle',
+                              action='store_true',
+                              help="Do not shuffle training data.")
 
 
 def add_train_cli_args(params):
@@ -1106,6 +1109,7 @@ def add_train_cli_args(params):
     add_training_args(params)
     add_device_args(params)
     add_logging_args(params)
+    add_sentencepiece_args(params)
 
 
 def add_translate_cli_args(params):

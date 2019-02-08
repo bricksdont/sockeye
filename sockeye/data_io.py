@@ -783,11 +783,11 @@ def get_training_data_iters(sources: List[str],
                             max_seq_len_target: int,
                             bucketing: bool,
                             bucket_width: int,
-                            use_spm: bool,
-                            spm_alpha: float,
-                            spm_nbest_size: int,
-                            spm_model: str,
-                            output_folder: str,
+                            use_spm: Optional[bool] =False,
+                            spm_alpha: Optional[float] = 0.1,
+                            spm_nbest_size: Optional[int] = 64,
+                            spm_model: Optional[str] = None,
+                            output_folder: Optional[str] = None,
                             permute: bool = True,
                             allow_empty: bool = False) -> Tuple['BaseParallelSampleIter',
                                                            Optional['BaseParallelSampleIter'],
@@ -819,6 +819,7 @@ def get_training_data_iters(sources: List[str],
     logger.info("Creating training data iterator")
     logger.info("===============================")
     
+    sentencepiece_sampler=None
     if use_spm:
         sentencepiece_sampler = spm_sample.SentencepieceSampler(
                                 spm_alpha=spm_alpha,
@@ -891,8 +892,6 @@ def get_training_data_iters(sources: List[str],
                              num_source_factors=len(sources),
                              source_with_eos=True)
     
-    
-    print("sampler: {}".format(sentencepiece_sampler))
     train_iter = ParallelSampleIter(data=training_data,
                                     buckets=buckets,
                                     batch_size=batch_size,
@@ -1665,29 +1664,31 @@ class ParallelSampleIter(BaseParallelSampleIter):
                                   for i in range(len(self.data))]
         self.use_spm=use_spm
         self.spm_sampler= sentencepiece_sampler
-        self.first_epoch=True
-        self.reset()
-        self.first_epoch=False
+        if self.permute:
+            self.shuffle()
+        
+    def shuffle(self):
+         # shuffle batch start indices
+        random.shuffle(self.batch_indices)
+
+        # restore the data permutation
+        self.data = self.data.permute(self.inverse_data_permutations)
+
+        # permute the data within each batch
+        self.data_permutations, self.inverse_data_permutations = get_permutations(self.data.get_bucket_counts())
+        self.data = self.data.permute(self.data_permutations)
 
     def reset(self):
         """
         Resets and reshuffles the data.
         """
         self.curr_batch_index = 0
-        if self.use_spm and not self.first_epoch:
+        if self.use_spm:
             logger.info("New epoch, sampling with sentencepiece")
             self = self.spm_sampler.resample()
         
         if self.permute:
-            # shuffle batch start indices
-            random.shuffle(self.batch_indices)
-
-            # restore the data permutation
-            self.data = self.data.permute(self.inverse_data_permutations)
-
-            # permute the data within each batch
-            self.data_permutations, self.inverse_data_permutations = get_permutations(self.data.get_bucket_counts())
-            self.data = self.data.permute(self.data_permutations)
+            self.shuffle()
 
     def iter_next(self) -> bool:
         """

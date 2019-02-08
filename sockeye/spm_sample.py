@@ -63,7 +63,6 @@ class SentencepieceSampler:
     def sample(self):
         output_name_s = os.path.join(self.output_folder, "source.spm." + str(self._counter))
         output_name_t = os.path.join(self.output_folder, "target.spm." + str(self._counter))
-        self._counter +=1
     
         spm_file_s = open(output_name_s, 'w')
         spm_file_t = open(output_name_t, 'w')
@@ -78,6 +77,7 @@ class SentencepieceSampler:
         spm_file_t.close()
         
         logger.info("Sampled data for epoch %i" % (self._counter))
+        self._counter +=1
         return output_name_s, output_name_t
     
     def split_validation(self, validation_sources, validation_target):
