@@ -820,7 +820,7 @@ def get_training_data_iters(sources: List[str],
     logger.info("===============================")
     
     if use_spm:
-        sentencepiece_sampler = spm_sample.sentencepieceSampler(
+        sentencepiece_sampler = spm_sample.SentencepieceSampler(
                                 spm_alpha=spm_alpha,
                                 spm_nbest_size=spm_nbest_size,
                                 spm_model=spm_model,
@@ -892,7 +892,7 @@ def get_training_data_iters(sources: List[str],
                              source_with_eos=True)
     
     
-
+    print("sampler: {}".format(sentencepiece_sampler))
     train_iter = ParallelSampleIter(data=training_data,
                                     buckets=buckets,
                                     batch_size=batch_size,
@@ -1645,7 +1645,7 @@ class ParallelSampleIter(BaseParallelSampleIter):
                  permute: bool = True,
                  dtype='float32',
                  use_spm: Optional[bool] = False,
-                 sentencepiece_sampler: Optional[spm_sample.sentencepieceSampler] = None) -> None:
+                 sentencepiece_sampler: Optional[spm_sample.SentencepieceSampler] = None) -> None:
         super().__init__(buckets=buckets, batch_size=batch_size, bucket_batch_sizes=bucket_batch_sizes,
                          source_data_name=source_data_name, target_data_name=target_data_name,
                          label_name=label_name, num_factors=num_factors, permute=permute, dtype=dtype)

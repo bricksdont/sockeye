@@ -1,5 +1,6 @@
 import os
 from typing import Dict, Iterable, List
+import logging
 
 import mxnet as mx
 import sentencepiece as spm
@@ -10,8 +11,9 @@ from . import utils
 from . import vocab
 from . import data_io
 
+logger = logging.getLogger(__name__)
 
-class sentencepieceSampler:
+class SentencepieceSampler:
     def __init__(self,
                  spm_alpha: float,
                  spm_nbest_size: int,
@@ -34,6 +36,7 @@ class sentencepieceSampler:
         self.spm_alpha=spm_alpha
         self.spm_nbest_size=spm_nbest_size
         self.sp = spm.SentencePieceProcessor()
+        logger.info("Loading sentencepiece language model for segmentation from %s" % spm_model)
         self.sp.Load(spm_model)
         self.source_vocabs = source_vocabs
         self.source_vocab = source_vocabs[0]
@@ -54,13 +57,14 @@ class sentencepieceSampler:
         self.batch_num_devices= batch_num_devices
         self.fill_up= fill_up
         self.permute=permute
-        self.counter=0
+        self._counter=0
         
     # read text files and use spm model to split words    
     def sample(self):
-        output_name_s = os.path.join(self.output_folder, "source.spm." + str(self.counter))
-        output_name_t = os.path.join(self.output_folder, "target.spm." + str(self.counter))
-        self.counter +=1
+        output_name_s = os.path.join(self.output_folder, "source.spm." + str(self._counter))
+        output_name_t = os.path.join(self.output_folder, "target.spm." + str(self._counter))
+        self._counter +=1
+    
         spm_file_s = open(output_name_s, 'w')
         spm_file_t = open(output_name_t, 'w')
         
@@ -73,6 +77,7 @@ class sentencepieceSampler:
         spm_file_s.close()
         spm_file_t.close()
         
+        logger.info("Sampled data for epoch %i" % (self._counter))
         return output_name_s, output_name_t
     
     def split_validation(self, validation_sources, validation_target):
@@ -91,6 +96,7 @@ class sentencepieceSampler:
         spm_file_valid_s.close()
         spm_file_valid_t.close()
         
+        logger.info("Segmented dev set with sentencepiece language model (best segmentation)")
         return output_name_valid_s, output_name_valid_t
         
         
@@ -134,3 +140,9 @@ class sentencepieceSampler:
                                     use_spm=True,
                                     sentencepiece_sampler=self)
            return train_iter
+
+    def get_epoch_counter(self):
+        return self._counter
+    
+    def increase_epoch_counter(self):
+        self._counter +=1

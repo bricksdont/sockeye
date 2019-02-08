@@ -311,6 +311,8 @@ def create_data_iters_and_vocabs(args: argparse.Namespace,
 
         else:
             # Load or create vocabs
+            check_condition((args.source_vocab is not None and args.target_vocab is not None and args.use_spm), "Need existing vocabularies with spm segmentation, cannot create vocabs based on sampling (vocabularies might be incomplete)")
+            
             source_factor_vocab_paths = [args.source_factor_vocabs[i] if i < len(args.source_factor_vocabs)
                                          else None for i in range(len(args.source_factors))]
             source_vocab_paths = [args.source_vocab] + source_factor_vocab_paths

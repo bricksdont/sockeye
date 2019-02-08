@@ -1084,7 +1084,8 @@ def add_training_args(params):
     
     train_params.add_argument('--use-spm',
                               action='store_true',
-                              help="Use sentencepiece for segmentation.")    
+                              default=False,
+                              help="Use sentencepiece for segmentation. Note: training and dev set should be full text (tokenized, truecased or raw, depending on the sentencepiece language model). Full vocabularies are required, otherwise we might end up with incomplete vocabs.")    
     train_params.add_argument('--spm-alpha',
                               type=float,
                               default=0.1,
@@ -1095,6 +1096,7 @@ def add_training_args(params):
                               help="Nbest size for sentencepiece sampling.")
     train_params.add_argument('--spm-model',
                               type=regular_file(),
+                              default=None,
                               help="Sentencepiece model.")
 
 
