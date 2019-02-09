@@ -22,6 +22,7 @@ from contextlib import ExitStack
 from typing import Any, Dict, Optional, List
 
 import mxnet as mx
+import sentencepiece as spm
 
 import sockeye.output_handler
 import sockeye.translate
@@ -119,7 +120,9 @@ class CheckpointDecoder:
 
     def decode_and_evaluate(self,
                             checkpoint: Optional[int] = None,
-                            output_name: str = os.devnull) -> Dict[str, float]:
+                            output_name: str = os.devnull,
+                            use_spm: Optional[bool] = False,
+                            spm_model: Optional[str] =None) -> Dict[str, float]:
         """
         Decodes data set and evaluates given a checkpoint.
 
@@ -148,6 +151,10 @@ class CheckpointDecoder:
                                           target_vocab=target_vocab,
                                           restrict_lexicon=None,
                                           store_beam=False)
+        if use_spm:
+             self.sp = spm.SentencePieceProcessor()
+             self.sp.Load(spm_model)
+             logger.info("checkpoint decoder loaded sentencepiece language model %s" % spm_model)
         trans_wall_time = 0.0
         translations = []
         with data_io.smart_open(output_name, 'w') as output:
@@ -160,6 +167,8 @@ class CheckpointDecoder:
             trans_wall_time = time.time() - tic
             for trans_input, trans_output in zip(trans_inputs, trans_outputs):
                 handler.handle(trans_input, trans_output)
+                if use_spm:
+                    trans_output.translation = self.sp.decode_pieces(trans_output.translation.split())  
                 translations.append(trans_output.translation)
         avg_time = trans_wall_time / len(self.target_sentences)
 

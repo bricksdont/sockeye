@@ -901,7 +901,9 @@ def train(args: argparse.Namespace) -> training.TrainState:
                                      mxmonitor_pattern=args.monitor_pattern,
                                      mxmonitor_stat_func=args.monitor_stat_func,
                                      allow_missing_parameters=args.allow_missing_params or model_config.lhuc,
-                                     existing_parameters=args.params)
+                                     existing_parameters=args.params,
+                                     use_spm=args.use_spm,
+                                     spm_model=args.spm_model)
         return training_state
 
 if __name__ == "__main__":

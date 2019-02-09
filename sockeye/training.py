@@ -460,7 +460,9 @@ class EarlyStoppingTrainer:
             mxmonitor_pattern: Optional[str] = None,
             mxmonitor_stat_func: Optional[str] = None,
             allow_missing_parameters: bool = False,
-            existing_parameters: Optional[str] = None) -> TrainState:
+            existing_parameters: Optional[str] = None,
+            use_spm: Optional[bool] = False,
+            spm_model: Optional[str] =None) -> TrainState:
         """
         Fits model to data given by train_iter using early-stopping w.r.t data given by val_iter.
         Saves all intermediate and final output to output_folder.
@@ -497,6 +499,8 @@ class EarlyStoppingTrainer:
         """
         self._check_args(metrics, early_stopping_metric, lr_decay_opt_states_reset, lr_decay_param_reset, decoder)
         logger.info("Early stopping by optimizing '%s'", early_stopping_metric)
+        self.use_spm = use_spm
+        self.spm_model = spm_model
 
         self._initialize_parameters(existing_parameters, allow_missing_parameters)
         self._initialize_optimizer()
@@ -520,7 +524,7 @@ class EarlyStoppingTrainer:
 
         process_manager = None
         if decoder is not None:
-            process_manager = DecoderProcessManager(self.model.output_dir, decoder=decoder)
+            process_manager = DecoderProcessManager(self.model.output_dir, decoder=decoder, use_spm=self.use_spm, spm_model=self.spm_model)
 
         if mxmonitor_pattern is not None:
             self.model.install_monitor(mxmonitor_pattern, mxmonitor_stat_func)
@@ -1123,12 +1127,16 @@ class DecoderProcessManager(object):
 
     def __init__(self,
                  output_folder: str,
-                 decoder: checkpoint_decoder.CheckpointDecoder) -> None:
+                 decoder: checkpoint_decoder.CheckpointDecoder,
+                 use_spm: Optional[bool] = False,
+                 spm_model: Optional[str] =None) -> None:
         self.output_folder = output_folder
         self.decoder = decoder
         self.ctx = mp_utils.get_context()  # type: ignore
         self.decoder_metric_queue = self.ctx.Queue()
         self.decoder_process = None  # type: Optional[multiprocessing.Process]
+        self.use_spm=use_spm
+        self.spm_model=spm_model
 
     def start_decoder(self, checkpoint: int):
         """
@@ -1139,7 +1147,7 @@ class DecoderProcessManager(object):
         assert self.decoder_process is None
         output_name = os.path.join(self.output_folder, C.DECODE_OUT_NAME % checkpoint)
         self.decoder_process = self.ctx.Process(target=_decode_and_evaluate,
-                                                args=(self.decoder, checkpoint, output_name, self.decoder_metric_queue))
+                                                args=(self.decoder, checkpoint, output_name, self.decoder_metric_queue, self.use_spm, self.spm_model))
         self.decoder_process.name = 'Decoder-%d' % checkpoint
         logger.info("Starting process: %s", self.decoder_process.name)
         self.decoder_process.start()
@@ -1178,10 +1186,12 @@ class DecoderProcessManager(object):
 def _decode_and_evaluate(decoder: checkpoint_decoder.CheckpointDecoder,
                          checkpoint: int,
                          output_name: str,
-                         queue: multiprocessing.Queue):
+                         queue: multiprocessing.Queue,
+                         use_spm: Optional[bool] = False,
+                         spm_model: Optional[str] =None):
     """
     Decodes and evaluates using given checkpoint_decoder and puts result in the queue,
     indexed by the checkpoint.
     """
-    metrics = decoder.decode_and_evaluate(checkpoint, output_name)
+    metrics = decoder.decode_and_evaluate(checkpoint, output_name, use_spm, spm_model)
     queue.put((checkpoint, metrics))
