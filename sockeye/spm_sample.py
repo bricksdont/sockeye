@@ -61,8 +61,8 @@ class SentencepieceSampler:
         
     # read text files and use spm model to split words    
     def sample(self):
-        output_name_s = os.path.join(self.output_folder, "source.spm." + str(self._counter))
-        output_name_t = os.path.join(self.output_folder, "target.spm." + str(self._counter))
+        output_name_s = os.path.join(self.output_folder, C.SOURCE_SPM + str(self._counter))
+        output_name_t = os.path.join(self.output_folder, C.TARGET_SPM + str(self._counter))
     
         spm_file_s = open(output_name_s, 'w')
         spm_file_t = open(output_name_t, 'w')
@@ -82,8 +82,8 @@ class SentencepieceSampler:
     
     def split_validation(self, validation_sources, validation_target):
         # dev set: best segmentation, no sampling
-        output_name_valid_s = os.path.join(self.output_folder, "dev.source.spm")
-        output_name_valid_t = os.path.join(self.output_folder, "dev.target.spm" )
+        output_name_valid_s = os.path.join(self.output_folder, C.SOURCE_SPM_VALIDATION)
+        output_name_valid_t = os.path.join(self.output_folder, C.TARGET_SPM_VALIDATION )
         spm_file_valid_s = open(output_name_valid_s, 'w')
         spm_file_valid_t = open(output_name_valid_t, 'w')
         

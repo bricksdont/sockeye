@@ -193,9 +193,16 @@ def create_checkpoint_decoder(args: argparse.Namespace,
     else:
         # default decode context is the last training device
         context = train_context[-1]
+        
+    source_input = args.validation_source
+        
+    if args.use_spm:
+        # use one-best segmentation of dev set as input
+        output_folder = os.path.abspath(args.output)
+        source_input = os.path.join(output_folder, C.SOURCE_SPM_VALIDATION)
 
     return checkpoint_decoder.CheckpointDecoder(context=context,
-                                                inputs=[args.validation_source] + args.validation_source_factors,
+                                                inputs=[source_input] + args.validation_source_factors,
                                                 references=args.validation_target,
                                                 model=args.output,
                                                 sample_size=sample_size)

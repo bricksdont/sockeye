@@ -166,9 +166,9 @@ class CheckpointDecoder:
             trans_outputs = translator.translate(trans_inputs)
             trans_wall_time = time.time() - tic
             for trans_input, trans_output in zip(trans_inputs, trans_outputs):
-                handler.handle(trans_input, trans_output)
                 if use_spm:
-                    trans_output.translation = self.sp.decode_pieces(trans_output.translation.split())  
+                    trans_output.translation = self.sp.decode_pieces(trans_output.translation.split()) 
+                handler.handle(trans_input, trans_output)
                 translations.append(trans_output.translation)
         avg_time = trans_wall_time / len(self.target_sentences)
 
