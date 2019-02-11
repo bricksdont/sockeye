@@ -102,8 +102,8 @@ class SentencepieceSampler:
         
     def resample(self):
            new_source, new_target = self.sample()
-           new_sources = self.original_sources
-           new_sources[0] =new_source
+           new_sources = self.original_sources.copy()
+           new_sources[0] = new_source
            length_statistics = data_io.analyze_sequence_lengths(new_sources, new_target, 
                                                          self.source_vocabs, self.target_vocab, self.max_seq_len_source, self.max_seq_len_target)
            buckets = data_io.define_parallel_buckets(self.max_seq_len_source, 
