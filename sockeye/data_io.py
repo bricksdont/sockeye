@@ -840,7 +840,9 @@ def get_training_data_iters(sources: List[str],
                                 fill_up=fill_up,
                                 permute=permute
                                 )
-        sources[0], target = sentencepiece_sampler.sample()
+        new_source, target = sentencepiece_sampler.sample()
+        sources = sources.copy()
+        sources[0] = new_source
     
     # Pass 1: get target/source length ratios.
     length_statistics = analyze_sequence_lengths(sources, target, source_vocabs, target_vocab,
