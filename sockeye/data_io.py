@@ -1687,7 +1687,12 @@ class ParallelSampleIter(BaseParallelSampleIter):
         self.curr_batch_index = 0
         if self.use_spm:
             logger.info("New epoch, sampling with sentencepiece")
-            self = self.spm_sampler.resample()
+            self.buckets, self.bucket_batch_sizes, self.data = self.spm_sampler.resample()
+            self.batch_indices = get_batch_indices(self.data, self.bucket_batch_sizes)
+            self.inverse_data_permutations = [mx.nd.arange(0, max(1, self.data.source[i].shape[0])) 
+                                  for i in range(len(self.data))]
+            self.data_permutations = [mx.nd.arange(0, max(1, self.data.source[i].shape[0]))
+                                  for i in range(len(self.data))]
         
         if self.permute:
             self.shuffle()

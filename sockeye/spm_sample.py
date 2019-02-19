@@ -130,16 +130,8 @@ class SentencepieceSampler:
            
            training_data = data_loader.load(sources_sentences, target_sentences,
                                             data_statistics.num_sents_per_bucket).fill_up(bucket_batch_sizes, self.fill_up)
-           
-           train_iter = data_io.ParallelSampleIter(data=training_data,
-                                    buckets=buckets,
-                                    batch_size=self.batch_size,
-                                    bucket_batch_sizes=bucket_batch_sizes,
-                                    num_factors=len(new_sources),
-                                    permute=self.permute,
-                                    use_spm=True,
-                                    sentencepiece_sampler=self)
-           return train_iter
+                                    
+           return buckets, bucket_batch_sizes, training_data
 
     def get_epoch_counter(self):
         return self._counter
