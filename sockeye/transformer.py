@@ -42,7 +42,8 @@ class TransformerConfig(config.Config):
                  max_seq_len_target: int,
                  conv_config: Optional['encoder.ConvolutionalEmbeddingConfig'] = None,
                  lhuc: bool = False,
-                 dtype: str = C.DTYPE_FP32) -> None:  # type: ignore
+                 dtype: str = C.DTYPE_FP32,
+                 reconstructor_config: Optional['TransformerConfig'] = None) -> None:  # type: ignore
         super().__init__()
         self.model_size = model_size
         self.attention_heads = attention_heads
@@ -60,6 +61,7 @@ class TransformerConfig(config.Config):
         self.conv_config = conv_config
         self.use_lhuc = lhuc
         self.dtype = dtype
+        self.reconstructor_config = reconstructor_config
 
 
 class TransformerEncoderBlock:

@@ -469,7 +469,8 @@ class RecurrentDecoderConfig(Config):
                  layer_normalization: bool = False,
                  attention_in_upper_layers: bool = False,
                  dtype: str = C.DTYPE_FP32,
-                 enc_last_hidden_concat_to_embedding: bool = False) -> None:
+                 enc_last_hidden_concat_to_embedding: bool = False,
+                 reconstructor_config: Optional['RecurrentDecoderConfig'] = None) -> None:
 
         super().__init__()
         self.max_seq_len_source = max_seq_len_source
@@ -483,6 +484,7 @@ class RecurrentDecoderConfig(Config):
         self.attention_in_upper_layers = attention_in_upper_layers
         self.enc_last_hidden_concat_to_embedding = enc_last_hidden_concat_to_embedding
         self.dtype = dtype
+        self.reconstructor_config = reconstructor_config
 
 
 @Decoder.register(RecurrentDecoderConfig, C.RNN_DECODER_PREFIX)
@@ -960,7 +962,8 @@ class ConvolutionalDecoderConfig(Config):
                  positional_embedding_type: str,
                  project_qkv: bool = False,
                  hidden_dropout: float = .0,
-                 dtype: str = C.DTYPE_FP32) -> None:
+                 dtype: str = C.DTYPE_FP32,
+                 reconstructor_config: Optional['ConvolutionalDecoderConfig'] = None) -> None:
         super().__init__()
         self.cnn_config = cnn_config
         self.max_seq_len_target = max_seq_len_target
@@ -971,6 +974,7 @@ class ConvolutionalDecoderConfig(Config):
         self.project_qkv = project_qkv
         self.hidden_dropout = hidden_dropout
         self.dtype = dtype
+        self.reconstructor_config = reconstructor_config
 
 
 @Decoder.register(ConvolutionalDecoderConfig, C.CNN_DECODER_PREFIX)

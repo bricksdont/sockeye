@@ -106,6 +106,8 @@ class SockeyeModel:
         # encoder & decoder first (to know the decoder depth)
         self.encoder = encoder.get_encoder(self.config.config_encoder, prefix=self.prefix)
         self.decoder = decoder.get_decoder(self.config.config_decoder, prefix=self.prefix)
+        if self.config.config_decoder.reconstructor_config is not None:
+            self.reconstructor = decoder.get_decoder(self.config.config_decoder.reconstructor_config, prefix=self.prefix + "reconstructor_")
 
         # source & target embeddings
         embed_weight_source, embed_weight_target, out_weight_target = self._get_embed_weights(self.prefix)
@@ -127,6 +129,13 @@ class SockeyeModel:
                                                weight=out_weight_target,
                                                weight_normalization=self.config.weight_normalization,
                                                prefix=self.prefix + C.DEFAULT_OUTPUT_LAYER_PREFIX)
+        # add output layer for reconstruction
+        if self.config.config_decoder.reconstructor_config is not None:
+            self.reconstruction_output_layer = layers.OutputLayer(hidden_size=self.reconstructor.get_num_hidden(),
+                                               vocab_size=self.config.vocab_source_size,
+                                               weight=embed_weight_source, 
+                                               weight_normalization=self.config.weight_normalization,
+                                               prefix=self.prefix + "reconstructor_" + C.DEFAULT_OUTPUT_LAYER_PREFIX)
 
         self.params = None  # type: Optional[Dict]
         self.aux_params = None  # type: Optional[Dict]

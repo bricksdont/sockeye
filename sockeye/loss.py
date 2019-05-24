@@ -100,7 +100,7 @@ class CrossEntropyLoss(Loss):
                     loss_config.normalization_type, loss_config.label_smoothing)
         self.loss_config = loss_config
 
-    def get_loss(self, logits: mx.sym.Symbol, labels: mx.sym.Symbol) -> List[mx.sym.Symbol]:
+    def get_loss(self, logits: mx.sym.Symbol, labels: mx.sym.Symbol, reconstruction: Optional[bool] = False) -> List[mx.sym.Symbol]:
         """
         Returns loss and softmax output symbols given logits and integer-coded labels.
 
@@ -108,6 +108,10 @@ class CrossEntropyLoss(Loss):
         :param labels: Shape: (batch_size * target_seq_len,).
         :return: List of loss symbol.
         """
+        if reconstruction:
+            outname="reconstruction_" + C.SOFTMAX_NAME
+        else:
+            outname=C.SOFTMAX_NAME
         if self.loss_config.normalization_type == C.LOSS_NORM_VALID:
             normalization = "valid"
         elif self.loss_config.normalization_type == C.LOSS_NORM_BATCH:
@@ -120,7 +124,7 @@ class CrossEntropyLoss(Loss):
                                      use_ignore=True,
                                      normalization=normalization,
                                      smooth_alpha=self.loss_config.label_smoothing,
-                                     name=C.SOFTMAX_NAME)]
+                                     name=outname)]
 
     def create_metric(self) -> "CrossEntropyMetric":
         return CrossEntropyMetric(self.loss_config)

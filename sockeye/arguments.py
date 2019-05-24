@@ -1102,6 +1102,15 @@ def add_sentencepiece_args(params):
                               action='store_true',
                               help="Do not shuffle training data.")
 
+def add_reconstruction_args(params):
+    reconstruction_params = params.add_argument_group("Reconstruction parameters")  
+    reconstruction_params.add_argument('--reconstruction', 
+                                       action="store_true", 
+                                       default=False,
+                                       help='Use a reconstructor to train with additional reconstruction loss. Needs parameters of a trained model to initialize, --params and --allow-missing-params. Default: %(default)s.')
+    reconstruction_params.add_argument('--reconstruction-lambda',
+                                       type=int, default=1,
+                                       help='Lambda to weigh the reconstruction loss. Default: %(default)s.')
 
 def add_train_cli_args(params):
     add_training_io_args(params)
@@ -1110,6 +1119,7 @@ def add_train_cli_args(params):
     add_device_args(params)
     add_logging_args(params)
     add_sentencepiece_args(params)
+    add_reconstruction_args(params)
 
 
 def add_translate_cli_args(params):
@@ -1387,3 +1397,4 @@ def add_init_embedding_args(params):
                         help='File to write initialized parameters to.')
     params.add_argument('--encoding', '-c', type=str, default=C.VOCAB_ENCODING,
                         help='Open input vocabularies with specified encoding. Default: %(default)s.')
+    
