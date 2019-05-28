@@ -51,6 +51,7 @@ from . import training
 from . import transformer
 from . import utils
 from . import vocab
+from . import reconstruction
 from .config import Config
 from .log import setup_main_logger
 from .optimizers import OptimizerConfig
@@ -116,6 +117,10 @@ def check_arg_compatibility(args: argparse.Namespace):
     if args.decoder_only:
         check_condition(args.decoder != C.TRANSFORMER_TYPE and args.decoder != C.CONVOLUTION_TYPE,
                         "Decoder pre-training currently supports RNN decoders only.")
+        
+    if args.reconstruction: # TODO pytest fails here with AttributeError: 'Namespace' object has no attribute 'reconstruction'...
+        check_condition(args.params != None or not args.allow_missing_parameters,
+                        "Need parameter file of a trained model to initialize reconstructor, and need --allow-missing-parameters to continue training with reconstruction loss.")
 
 
 def check_resume(args: argparse.Namespace, output_folder: str) -> bool:
@@ -467,6 +472,8 @@ def create_decoder_config(args: argparse.Namespace, encoder_num_hidden: int,
     """
     _, decoder_num_layers = args.num_layers
     _, num_embed_target = args.num_embed
+    reconstruction = args.reconstruction
+    reconstructor_config = None
 
     config_decoder = None  # type: Optional[Config]
 
@@ -475,6 +482,24 @@ def create_decoder_config(args: argparse.Namespace, encoder_num_hidden: int,
             raise NotImplementedError()
         _, decoder_transformer_preprocess = args.transformer_preprocess
         _, decoder_transformer_postprocess = args.transformer_postprocess
+        
+        if reconstruction:
+            reconstructor_config = transformer.TransformerConfig(
+                model_size=args.transformer_model_size[1],
+                attention_heads=args.transformer_attention_heads[1],
+                feed_forward_num_hidden=args.transformer_feed_forward_num_hidden[1],
+                act_type=args.transformer_activation_type,
+                num_layers=decoder_num_layers,
+                dropout_attention=args.transformer_dropout_attention,
+                dropout_act=args.transformer_dropout_act,
+                dropout_prepost=args.transformer_dropout_prepost,
+                positional_embedding_type=args.transformer_positional_embedding_type,
+                preprocess_sequence=decoder_transformer_preprocess,
+                postprocess_sequence=decoder_transformer_postprocess,
+                max_seq_len_source=max_seq_len_target, # swap source and target max len for reconstructor
+                max_seq_len_target=max_seq_len_source,
+                conv_config=None,
+                lhuc=args.lhuc is not None and (C.LHUC_DECODER in args.lhuc or C.LHUC_ALL in args.lhuc))
         config_decoder = transformer.TransformerConfig(
             model_size=args.transformer_model_size[1],
             attention_heads=args.transformer_attention_heads[1],
@@ -490,7 +515,8 @@ def create_decoder_config(args: argparse.Namespace, encoder_num_hidden: int,
             max_seq_len_source=max_seq_len_source,
             max_seq_len_target=max_seq_len_target,
             conv_config=None,
-            lhuc=args.lhuc is not None and (C.LHUC_DECODER in args.lhuc or C.LHUC_ALL in args.lhuc))
+            lhuc=args.lhuc is not None and (C.LHUC_DECODER in args.lhuc or C.LHUC_ALL in args.lhuc),
+            reconstructor_config=reconstructor_config)
 
     elif args.decoder == C.CONVOLUTION_TYPE:
         if args.decoder_only:
@@ -500,6 +526,15 @@ def create_decoder_config(args: argparse.Namespace, encoder_num_hidden: int,
                                                            num_hidden=args.cnn_num_hidden,
                                                            act_type=args.cnn_activation_type,
                                                            weight_normalization=args.weight_normalization)
+        if reconstruction:
+            reconstructor_config = decoder.ConvolutionalDecoderConfig(cnn_config=convolution_config,
+                                                            max_seq_len_target=max_seq_len_source, #swap source and target max len for reconstruction
+                                                            num_embed=num_embed_source, # target of reconstruction is the source
+                                                            encoder_num_hidden=encoder_num_hidden,
+                                                            num_layers=decoder_num_layers,
+                                                            positional_embedding_type=args.cnn_positional_embedding_type,
+                                                            project_qkv=args.cnn_project_qkv,
+                                                            hidden_dropout=args.cnn_hidden_dropout)
         config_decoder = decoder.ConvolutionalDecoderConfig(cnn_config=convolution_config,
                                                             max_seq_len_target=max_seq_len_target,
                                                             num_embed=num_embed_target,
@@ -507,7 +542,8 @@ def create_decoder_config(args: argparse.Namespace, encoder_num_hidden: int,
                                                             num_layers=decoder_num_layers,
                                                             positional_embedding_type=args.cnn_positional_embedding_type,
                                                             project_qkv=args.cnn_project_qkv,
-                                                            hidden_dropout=args.cnn_hidden_dropout)
+                                                            hidden_dropout=args.cnn_hidden_dropout,
+                                                            reconstructor_config=reconstructor_config)
 
     else:
         if args.decoder_only:
@@ -537,6 +573,28 @@ def create_decoder_config(args: argparse.Namespace, encoder_num_hidden: int,
         _, decoder_rnn_dropout_inputs = args.rnn_dropout_inputs
         _, decoder_rnn_dropout_states = args.rnn_dropout_states
         _, decoder_rnn_dropout_recurrent = args.rnn_dropout_recurrent
+        
+        if reconstruction:
+            reconstructor_config =  decoder.RecurrentDecoderConfig(
+                max_seq_len_source=max_seq_len_target, #swap source and target max len for reconstructor
+                rnn_config=rnn.RNNConfig(cell_type=args.rnn_cell_type,
+                                         num_hidden=args.rnn_num_hidden,
+                                         num_layers=decoder_num_layers,
+                                         dropout_inputs=decoder_rnn_dropout_inputs,
+                                         dropout_states=decoder_rnn_dropout_states,
+                                         dropout_recurrent=decoder_rnn_dropout_recurrent,
+                                         residual=args.rnn_residual_connections,
+                                         first_residual_layer=args.rnn_first_residual_layer,
+                                         forget_bias=args.rnn_forget_bias,
+                                         lhuc=args.lhuc is not None and (C.LHUC_DECODER in args.lhuc or C.LHUC_ALL in args.lhuc)),
+                attention_config=config_attention,
+                hidden_dropout=args.rnn_decoder_hidden_dropout,
+                state_init=args.rnn_decoder_state_init,
+                context_gating=args.rnn_context_gating,
+                layer_normalization=args.layer_normalization,
+                attention_in_upper_layers=args.rnn_attention_in_upper_layers,
+                state_init_lhuc=args.lhuc is not None and (C.LHUC_STATE_INIT in args.lhuc or C.LHUC_ALL in args.lhuc),
+                enc_last_hidden_concat_to_embedding=args.rnn_enc_last_hidden_concat_to_embedding)
 
         config_decoder = decoder.RecurrentDecoderConfig(
             max_seq_len_source=max_seq_len_source,
@@ -557,7 +615,8 @@ def create_decoder_config(args: argparse.Namespace, encoder_num_hidden: int,
             layer_normalization=args.layer_normalization,
             attention_in_upper_layers=args.rnn_attention_in_upper_layers,
             state_init_lhuc=args.lhuc is not None and (C.LHUC_STATE_INIT in args.lhuc or C.LHUC_ALL in args.lhuc),
-            enc_last_hidden_concat_to_embedding=args.rnn_enc_last_hidden_concat_to_embedding)
+            enc_last_hidden_concat_to_embedding=args.rnn_enc_last_hidden_concat_to_embedding,
+            reconstructor_config=reconstructor_config)
 
     return config_decoder
 
@@ -676,6 +735,18 @@ def create_training_model(config: model.ModelConfig,
     :param args: Arguments as returned by argparse.
     :return: The training model.
     """
+    if args.reconstruction:
+        training_model = reconstruction.ReconstructionModel(config=config,
+                                            context=context,
+                                            output_dir=output_dir,
+                                            provide_data=train_iter.provide_data,
+                                            provide_label=train_iter.provide_label,
+                                            default_bucket_key=train_iter.default_bucket_key,
+                                            bucketing=not args.no_bucketing,
+                                            gradient_compression_params=gradient_compression_params(args),
+                                            fixed_param_names=args.fixed_param_names,
+                                            r_lambda=args.reconstruction_lambda)
+    
     training_model = training.TrainingModel(config=config,
                                             context=context,
                                             output_dir=output_dir,
@@ -866,7 +937,7 @@ def train(args: argparse.Namespace) -> training.TrainState:
             min_epochs = None
             max_epochs = None
 
-        trainer = training.EarlyStoppingTrainer(model=training_model,
+        trainer = training.EarlyStoppingTrainer(model=training_model, # TODO: EarlyStoppingTrainer expects training.TrainingModel
                                                 optimizer_config=create_optimizer_config(args, source_vocab_sizes),
                                                 max_params_files_to_keep=args.keep_last_params,
                                                 source_vocabs=source_vocabs,
