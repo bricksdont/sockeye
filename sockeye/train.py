@@ -51,7 +51,6 @@ from . import training
 from . import transformer
 from . import utils
 from . import vocab
-from . import reconstruction
 from .config import Config
 from .log import setup_main_logger
 from .optimizers import OptimizerConfig
@@ -736,7 +735,7 @@ def create_training_model(config: model.ModelConfig,
     :return: The training model.
     """
     if args.reconstruction:
-        training_model = reconstruction.ReconstructionModel(config=config,
+        training_model = training.ReconstructionModel(config=config,
                                             context=context,
                                             output_dir=output_dir,
                                             provide_data=train_iter.provide_data,
@@ -937,7 +936,7 @@ def train(args: argparse.Namespace) -> training.TrainState:
             min_epochs = None
             max_epochs = None
 
-        trainer = training.EarlyStoppingTrainer(model=training_model, # TODO: EarlyStoppingTrainer expects training.TrainingModel
+        trainer = training.EarlyStoppingTrainer(model=training_model,
                                                 optimizer_config=create_optimizer_config(args, source_vocab_sizes),
                                                 max_params_files_to_keep=args.keep_last_params,
                                                 source_vocabs=source_vocabs,

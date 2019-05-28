@@ -363,6 +363,159 @@ class TrainingModel(model.SockeyeModel):
     @property
     def monitor(self) -> Optional[mx.monitor.Monitor]:
         return self._monitor
+    
+    
+class ReconstructionModel(TrainingModel):
+    """
+    TrainingModel is a SockeyeModel that fully unrolls over source and target sequences.
+
+    :param config: Configuration object holding details about the model.
+    :param context: The context(s) that MXNet will be run in (GPU(s)/CPU).
+    :param output_dir: Directory where this model is stored.
+    :param provide_data: List of input data descriptions.
+    :param provide_label: List of label descriptions.
+    :param default_bucket_key: Default bucket key.
+    :param bucketing: If True bucketing will be used, if False the computation graph will always be
+            unrolled to the full length.
+    :param gradient_compression_params: Optional dictionary of gradient compression parameters.
+    :param fixed_param_names: Optional list of params to fix during training (i.e. their values will not be trained).
+    """
+
+    def __init__(self,
+                 config: model.ModelConfig,
+                 context: List[mx.context.Context],
+                 output_dir: str,
+                 provide_data: List[mx.io.DataDesc],
+                 provide_label: List[mx.io.DataDesc],
+                 default_bucket_key: Tuple[int, int],
+                 bucketing: bool,
+                 gradient_compression_params: Optional[Dict[str, Any]] = None,
+                 fixed_param_names: Optional[List[str]] = None,
+                 r_lambda: Optional[int] = 1) -> None:
+        model.SockeyeModel.__init__(self, config=config)  # TODO: how to call __init__ of grandparent?
+        self.context = context
+        self.output_dir = output_dir
+        self.fixed_param_names = fixed_param_names
+        self._bucketing = bucketing
+        self._gradient_compression_params = gradient_compression_params
+        self._r_lambda = r_lambda
+        self._initialize(provide_data, provide_label, default_bucket_key)
+        self._monitor = None  # type: Optional[mx.monitor.Monitor]
+
+    def _initialize(self,
+                    provide_data: List[mx.io.DataDesc],
+                    provide_label: List[mx.io.DataDesc],
+                    default_bucket_key: Tuple[int, int]):
+        """
+        Initializes model components, creates training symbol and module, and binds it.
+        """
+        source = mx.sym.Variable(C.SOURCE_NAME)
+        source_words = source.split(num_outputs=self.config.config_embed_source.num_factors,
+                                    axis=2, squeeze_axis=True)[0]
+        source_length = utils.compute_lengths(source_words)
+        source_labels = mx.sym.reshape(data=source_words, shape=(-1,), name="source_label")
+        target = mx.sym.Variable(C.TARGET_NAME)
+        target_length = utils.compute_lengths(target)
+        labels = mx.sym.reshape(data=mx.sym.Variable(C.TARGET_LABEL_NAME), shape=(-1,))
+
+        self.model_loss = loss.get_loss(self.config.config_loss)
+
+        data_names = [C.SOURCE_NAME, C.TARGET_NAME]
+        label_names = [C.TARGET_LABEL_NAME]
+
+        # check provide_{data,label} names
+        provide_data_names = [d[0] for d in provide_data]
+        utils.check_condition(provide_data_names == data_names,
+                              "incompatible provide_data: %s, names should be %s" % (provide_data_names, data_names))
+        provide_label_names = [d[0] for d in provide_label]
+        utils.check_condition(provide_label_names == label_names,
+                              "incompatible provide_label: %s, names should be %s" % (provide_label_names, label_names))
+
+        def sym_gen(seq_lens):
+            """
+            Returns a (grouped) loss symbol given source & target input lengths.
+            Also returns data and label names for the BucketingModule.
+            """
+            source_seq_len, target_seq_len = seq_lens
+
+            # source embedding
+            (source_embed,
+             source_embed_length,
+             source_embed_seq_len) = self.embedding_source.encode(source, source_length, source_seq_len)
+
+            # target embedding
+            (target_embed,
+             target_embed_length,
+             target_embed_seq_len) = self.embedding_target.encode(target, target_length, target_seq_len)
+
+            # encoder
+            # source_encoded: (batch_size, source_encoded_length, encoder_depth)
+            (source_encoded,
+             source_encoded_length,
+             source_encoded_seq_len) = self.encoder.encode(source_embed,
+                                                           source_embed_length,
+                                                           source_embed_seq_len)
+
+            # decoder
+            # target_decoded: (batch-size, target_len, decoder_depth)
+            target_decoded = self.decoder.decode_sequence(source_encoded, source_encoded_length, source_encoded_seq_len,
+                                                          target_embed, target_embed_length, target_embed_seq_len)
+            reconstructed_sequence = self.reconstructor.decode_sequence(target_decoded, target_embed_length, target_embed_seq_len,
+                                                          source_embed, source_embed_length, source_embed_seq_len)
+
+            # target_decoded: (batch_size * target_seq_len, decoder_depth)
+            target_decoded = mx.sym.reshape(data=target_decoded, shape=(-3, 0))
+            
+            reconstructed_sequence = mx.sym.reshape(data=reconstructed_sequence, shape=(-3, 0))
+            
+            # output layer
+            # logits: (batch_size * target_seq_len, target_vocab_size)
+            logits = self.output_layer(target_decoded)
+            reconstructed_logits = self.reconstruction_output_layer(reconstructed_sequence)
+
+            loss_output = self.model_loss.get_loss(logits, labels)
+            loss_reconstruction_output = self.model_loss.get_loss(reconstructed_logits, source_labels, reconstruction=True)
+            
+            loss_output = loss_output + self._r_lambda * loss_reconstruction_output
+
+            return mx.sym.Group(loss_output), data_names, label_names
+
+        if self.config.lhuc:
+            arguments = sym_gen(default_bucket_key)[0].list_arguments()
+            fixed_param_names = [a for a in arguments if not a.endswith(C.LHUC_NAME)]
+        else:
+            fixed_param_names = self.fixed_param_names
+
+        if self._bucketing:
+            logger.info("Using bucketing. Default max_seq_len=%s", default_bucket_key)
+            self.module = mx.mod.BucketingModule(sym_gen=sym_gen,
+                                                 logger=logger,
+                                                 default_bucket_key=default_bucket_key,
+                                                 context=self.context,
+                                                 compression_params=self._gradient_compression_params,
+                                                 fixed_param_names=fixed_param_names)
+        else:
+            logger.info("No bucketing. Unrolled to (%d,%d)",
+                        self.config.config_data.max_seq_len_source, self.config.config_data.max_seq_len_target)
+            symbol, _, __ = sym_gen(default_bucket_key)
+            self.module = mx.mod.Module(symbol=symbol,
+                                        data_names=data_names,
+                                        label_names=label_names,
+                                        logger=logger,
+                                        context=self.context,
+                                        compression_params=self._gradient_compression_params,
+                                        fixed_param_names=fixed_param_names)
+
+        self.module.bind(data_shapes=provide_data,
+                         label_shapes=provide_label,
+                         for_training=True,
+                         force_rebind=True,
+                         grad_req='write')
+
+        self.module.symbol.save(os.path.join(self.output_dir, C.SYMBOL_NAME))
+
+        self.save_version(self.output_dir)
+        self.save_config(self.output_dir)    
 
 
 def global_norm(ndarrays: List[mx.nd.NDArray]) -> float:
