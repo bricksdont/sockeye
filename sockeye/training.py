@@ -413,12 +413,13 @@ class ReconstructionModel(TrainingModel):
         source_words = source.split(num_outputs=self.config.config_embed_source.num_factors,
                                     axis=2, squeeze_axis=True)[0]
         source_length = utils.compute_lengths(source_words)
-        source_labels = mx.sym.reshape(data=source_words, shape=(-1,), name="source_label")
+        source_labels = mx.sym.reshape(data=source_words, shape=(-1,), name=C.SOURCE_LABEL_NAME)
         target = mx.sym.Variable(C.TARGET_NAME)
         target_length = utils.compute_lengths(target)
         labels = mx.sym.reshape(data=mx.sym.Variable(C.TARGET_LABEL_NAME), shape=(-1,))
 
         self.model_loss = loss.get_loss(self.config.config_loss)
+        self.reconstruction_loss = loss.get_loss(self.config.reconstruction_config_loss)
 
         data_names = [C.SOURCE_NAME, C.TARGET_NAME]
         label_names = [C.TARGET_LABEL_NAME]
@@ -474,7 +475,7 @@ class ReconstructionModel(TrainingModel):
             reconstructed_logits = self.reconstruction_output_layer(reconstructed_sequence)
 
             loss_output = self.model_loss.get_loss(logits, labels)
-            loss_reconstruction_output = self.model_loss.get_loss(reconstructed_logits, source_labels, reconstruction=True)
+            loss_reconstruction_output = self.reconstruction_loss.get_loss(reconstructed_logits, source_labels, name=C.SOFTMAX_RECONSTRUCTION_OUTPUT_NAME)
             
             loss_output = loss_output + self._r_lambda * loss_reconstruction_output
 

@@ -703,6 +703,12 @@ def create_model_config(args: argparse.Namespace,
                                   vocab_size=target_vocab_size,
                                   normalization_type=args.loss_normalization_type,
                                   label_smoothing=args.label_smoothing)
+    reconstruction_config_loss = None
+    if args.reconstruction:
+        reconstruction_config_loss = loss.LossConfig(name=args.loss,
+                                  vocab_size=source_vocab_size,
+                                  normalization_type=args.loss_normalization_type,
+                                  label_smoothing=args.label_smoothing)
 
     model_config = model.ModelConfig(config_data=config_data,
                                      vocab_source_size=source_vocab_size,
@@ -712,6 +718,7 @@ def create_model_config(args: argparse.Namespace,
                                      config_encoder=config_encoder,
                                      config_decoder=config_decoder,
                                      config_loss=config_loss,
+                                     reconstruction_config_loss=reconstruction_config_loss,
                                      weight_tying=args.weight_tying,
                                      weight_tying_type=args.weight_tying_type if args.weight_tying else None,
                                      weight_normalization=args.weight_normalization,

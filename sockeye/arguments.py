@@ -786,6 +786,7 @@ def add_training_args(params):
     train_params = params.add_argument_group("Training parameters")
 
     add_batch_args(train_params)
+    add_reconstruction_args(train_params)
 
     train_params.add_argument('--decoder-only',
                               action='store_true',
@@ -1085,7 +1086,6 @@ def add_train_cli_args(params):
     add_training_args(params)
     add_device_args(params)
     add_logging_args(params)
-    add_reconstruction_args(params)
 
 
 def add_translate_cli_args(params):

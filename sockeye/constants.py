@@ -159,6 +159,7 @@ CNN_PAD_CENTERED = "centered"
 # default I/O variable names
 SOURCE_NAME = "source"
 SOURCE_LENGTH_NAME = "source_length"
+SOURCE_LABEL_NAME = "source_label"
 TARGET_NAME = "target"
 TARGET_LABEL_NAME = "target_label"
 LEXICON_NAME = "lexicon"
@@ -172,6 +173,7 @@ LOGIT_INPUTS_NAME = "logit_inputs"
 LOGITS_NAME = "logits"
 SOFTMAX_NAME = "softmax"
 SOFTMAX_OUTPUT_NAME = SOFTMAX_NAME + "_output"
+SOFTMAX_RECONSTRUCTION_OUTPUT_NAME = SOFTMAX_NAME + "_reconstruction_output"
 
 MEASURE_SPEED_EVERY = 50  # measure speed and metrics every X batches
 
