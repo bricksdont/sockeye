@@ -307,7 +307,6 @@ def add_rerank_args(params):
                                action="store_true",
                                help="Returns the reranking scores as scores in output JSON objects.")
 
-
 def add_lexicon_args(params):
     lexicon_params = params.add_argument_group("Model & Top-k")
     lexicon_params.add_argument("--model", "-m", required=True,
@@ -1363,3 +1362,34 @@ def add_init_embedding_args(params):
                         help='File to write initialized parameters to.')
     params.add_argument('--encoding', '-c', type=str, default=C.VOCAB_ENCODING,
                         help='Open input vocabularies with specified encoding. Default: %(default)s.')
+    
+def add_reconstruction_score_args(params):
+    add_training_data_args(params, required=False)
+    add_vocab_args(params)
+    add_device_args(params)
+    add_logging_args(params)
+    add_batch_args(params)
+    
+    rescore_params = params.add_argument_group("Rescoring with reconstruction")
+    rescore_params.add_argument("--hypotheses", "-hy",
+                               type=str,
+                               required=True,
+                               help="File with nbest translations, one nbest list per line,"
+                                    "in JSON format as returned by sockeye.translate with --nbest-size x.")
+    rescore_params.add_argument("--reconstruction-lambda",
+                                type=int,
+                                default=1,
+                                help="Lambda hyperparameter for translation with reconstruction loss.")
+    rescore_params.add_argument("--model", "-m", 
+                                required=True,
+                                help="Model directory containing trained model.")
+    rescore_params.add_argument('--score-type',
+                                choices=C.SCORING_TYPE_CHOICES,
+                                default=C.SCORING_TYPE_DEFAULT,
+                                help='Score type to output. Default: %(default)s')
+    rescore_params.add_argument('--softmax-temperature',
+                                type=float,
+                                default=None,
+                                help='Controls peakiness of model predictions. Values < 1.0 produce '
+                                'peaked predictions, values > 1.0 produce smoothed distributions.')
+        

@@ -1014,6 +1014,17 @@ def read_content(path: str, limit: Optional[int] = None) -> Iterator[List[str]]:
             if limit is not None and i == limit:
                 break
             yield list(get_tokens(line))
+            
+def read_string(strings: List[str]) -> Iterator[List[str]]:
+    """
+    Returns a list of tokens for each line in strings.
+
+    :param strings: List of strings containing sentences.
+    :return: Iterator over lists of words.
+    """
+    for i, line in enumerate(strings):
+        yield list(get_tokens(line))
+    
 
 
 def tokens2ids(tokens: Iterable[str], vocab: Dict[str, int]) -> List[int]:
@@ -1112,6 +1123,54 @@ class SequenceReader(Iterable):
             if self.add_eos:
                 sequence.append(self.eos_id)
             yield sequence
+            
+class ReconstructionSequenceReader(SequenceReader):
+    """
+    Reads sequence samples list of strings and (optionally) creates integer id sequences.
+    Streams from disk, instead of loading all samples into memory.
+    Empty sequences are yielded as None.
+
+    :param strings: List of strings.
+    :param vocabulary: Optional mapping from strings to integer ids.
+    :param add_bos: Whether to add Beginning-Of-Sentence (BOS) symbol.
+    """
+
+    def __init__(self,
+                 strings: List[str],
+                 vocabulary: Optional[vocab.Vocab] = None,
+                 add_bos: bool = False,
+                 add_eos: bool = False) -> None:
+        self.strings = strings
+        self.vocab = vocabulary
+        self.bos_id = None
+        self.eos_id = None
+        if vocabulary is not None:
+            assert C.UNK_SYMBOL in vocabulary
+            assert vocabulary[C.PAD_SYMBOL] == C.PAD_ID
+            assert C.BOS_SYMBOL in vocabulary
+            assert C.EOS_SYMBOL in vocabulary
+            self.bos_id = vocabulary[C.BOS_SYMBOL]
+            self.eos_id = vocabulary[C.EOS_SYMBOL]
+        else:
+            check_condition(not add_bos and not add_eos, "Adding a BOS or EOS symbol requires a vocabulary")
+        self.add_bos = add_bos
+        self.add_eos = add_eos
+
+    def __iter__(self):
+        for tokens in read_string(self.strings):
+            if self.vocab is not None:
+                sequence = tokens2ids(tokens, self.vocab)
+            else:
+                sequence = strids2ids(tokens)
+            if len(sequence) == 0:
+                yield None
+                continue
+            if self.add_bos:
+                sequence.insert(0, self.bos_id)
+            if self.add_eos:
+                sequence.append(self.eos_id)
+            yield sequence
+    
 
 
 def create_sequence_readers(sources: List[str], target: str,

@@ -367,7 +367,11 @@ class TrainingModel(model.SockeyeModel):
     
 class ReconstructionModel(TrainingModel):
     """
-    TrainingModel is a SockeyeModel that fully unrolls over source and target sequences.
+    ReconstructionModel is a SockeyeModel that fully unrolls over source and target sequences.
+    The decoder consists of 2 separate decoders: 
+    1. A standard decoder that reads the encoder sequence and is trained to predict target sequences.
+    2. A reconstruction decoder that reads the decoder states and is trained to predict the original source sequence.
+    The losses from both decoders are combined with r_lambda.
 
     :param config: Configuration object holding details about the model.
     :param context: The context(s) that MXNet will be run in (GPU(s)/CPU).
@@ -516,8 +520,7 @@ class ReconstructionModel(TrainingModel):
         self.module.symbol.save(os.path.join(self.output_dir, C.SYMBOL_NAME))
 
         self.save_version(self.output_dir)
-        self.save_config(self.output_dir)    
-
+        self.save_config(self.output_dir)
 
 def global_norm(ndarrays: List[mx.nd.NDArray]) -> float:
     # accumulate in a list, as asscalar is blocking and this way we can run the norm calculation in parallel.

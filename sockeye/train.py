@@ -741,6 +741,15 @@ def create_training_model(config: model.ModelConfig,
     :param args: Arguments as returned by argparse.
     :return: The training model.
     """
+    training_model = training.TrainingModel(config=config,
+                                            context=context,
+                                            output_dir=output_dir,
+                                            provide_data=train_iter.provide_data,
+                                            provide_label=train_iter.provide_label,
+                                            default_bucket_key=train_iter.default_bucket_key,
+                                            bucketing=not args.no_bucketing,
+                                            gradient_compression_params=gradient_compression_params(args),
+                                            fixed_param_names=args.fixed_param_names)
     if args.reconstruction:
         training_model = training.ReconstructionModel(config=config,
                                             context=context,
@@ -752,16 +761,6 @@ def create_training_model(config: model.ModelConfig,
                                             gradient_compression_params=gradient_compression_params(args),
                                             fixed_param_names=args.fixed_param_names,
                                             r_lambda=args.reconstruction_lambda)
-    
-    training_model = training.TrainingModel(config=config,
-                                            context=context,
-                                            output_dir=output_dir,
-                                            provide_data=train_iter.provide_data,
-                                            provide_label=train_iter.provide_label,
-                                            default_bucket_key=train_iter.default_bucket_key,
-                                            bucketing=not args.no_bucketing,
-                                            gradient_compression_params=gradient_compression_params(args),
-                                            fixed_param_names=args.fixed_param_names)
 
     return training_model
 
