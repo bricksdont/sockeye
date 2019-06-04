@@ -1070,7 +1070,7 @@ def add_training_args(params):
 
 
 def add_reconstruction_args(params):
-    reconstruction_params = params.add_argument_group("Reconstruction parameters")  
+    reconstruction_params = params.add_argument_group("Reconstruction training parameters")  
     reconstruction_params.add_argument('--reconstruction', 
                                        action="store_true", 
                                        default=False,
@@ -1376,10 +1376,6 @@ def add_reconstruction_score_args(params):
                                required=True,
                                help="File with nbest translations, one nbest list per line,"
                                     "in JSON format as returned by sockeye.translate with --nbest-size x.")
-    rescore_params.add_argument("--reconstruction-lambda",
-                                type=int,
-                                default=1,
-                                help="Lambda hyperparameter for translation with reconstruction loss.")
     rescore_params.add_argument("--model", "-m", 
                                 required=True,
                                 help="Model directory containing trained model.")
@@ -1392,4 +1388,14 @@ def add_reconstruction_score_args(params):
                                 default=None,
                                 help='Controls peakiness of model predictions. Values < 1.0 produce '
                                 'peaked predictions, values > 1.0 produce smoothed distributions.')
+    rescore_params.add_argument('--output-type',
+                                type=str,
+                                default=C.OUTPUT_HANDLER_RECONSTRUCTION_SCORE,
+                                help='Print translation and reconstruction costs for n-best list with rescore.py. Default: %(default)s.')
+    rescore_params.add_argument('--reconstruction-costs-file',
+                                type=str,
+                                help='File to print reconstruction costs to. Default: %(default)s.')
+    rescore_params.add_argument("--output", "-o", 
+                                default=None,
+                                help="File to write rescored output to. Format: sentence id || hypothesis || translation score. Reconstruction costs are written to a separate file. Default: STDOUT.")
         

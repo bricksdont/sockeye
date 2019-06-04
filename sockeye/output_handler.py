@@ -24,6 +24,7 @@ from sockeye.utils import plot_attention, print_attention_text, get_alignments
 
 def get_output_handler(output_type: str,
                        output_fname: Optional[str] = None,
+                       reconstruction_costs_file: Optional[str] = None,
                        sure_align_threshold: float = 1.0) -> 'OutputHandler':
     """
 
@@ -34,6 +35,9 @@ def get_output_handler(output_type: str,
     :return: Output handler.
     """
     output_stream = sys.stdout if output_fname is None else data_io.smart_open(output_fname, mode='w')
+    
+    reconstruction_costs_stream = None if output_type is not C.OUTPUT_HANDLER_RECONSTRUCTION_SCORE else data_io.smart_open(reconstruction_costs_file, mode='w')
+    
     if output_type == C.OUTPUT_HANDLER_TRANSLATION:
         return StringOutputHandler(output_stream)
     elif output_type == C.OUTPUT_HANDLER_SCORE:
@@ -56,6 +60,8 @@ def get_output_handler(output_type: str,
         return BeamStoringHandler(output_stream)
     elif output_type == C.OUTPUT_HANDLER_NBEST:
         return NBestOutputHandler(output_stream, sure_align_threshold)
+    elif output_type == C.OUTPUT_HANDLER_RECONSTRUCTION_SCORE:
+        return ReconstructionScoreOutputHandler(output_stream, reconstruction_costs_stream)
     else:
         raise ValueError("unknown output type")
 
@@ -421,6 +427,41 @@ class NBestOutputHandler(OutputHandler):
               "alignments": extracted_alignments}
 
         self.stream.write("%s\n" % json.dumps(d_, sort_keys=True))
+
+    def reports_score(self) -> bool:
+        return True
+
+class ReconstructionScoreOutputHandler(OutputHandler):
+    """
+    Output handler to write reconstruction rescoring and reconstruction costs (2 files).
+    Output format allows to use the reranking scripts in: https://github.com/pjwilliams/nematus-recon-scripts
+    Reconstruction costs are written to a separate file, given as --reconstruction-costs-file.
+
+    :param stream_rescore: Stream to write the rescored nbest list, format is
+    sentence id || hypothesis || translation score.
+    """
+
+    def __init__(self, stream_rescore, reconstruction_costs_stream):
+        self.stream_rescore = stream_rescore
+        self.reconstruction_costs_stream = reconstruction_costs_stream
+
+    def handle(self,
+               t_input: inference.TranslatorInput,
+               t_output: inference.TranslatorOutput,
+               reconstruction_score: float,
+               t_walltime: float = 0.):
+        """
+        :param t_input: Translator input.
+        :param t_output: Translator output.
+        :param reconstruction_score: Reconstruction score.
+        :param reconstruction_costs_file: File to write reconstruction scores to.
+        :param t_walltime: Total walltime for translation.
+        """
+        self.stream_rescore.write("{} || {} || {:.3f}\n".format(t_output.sentence_id, t_output.translation ,t_output.score))
+        self.stream_rescore.flush()
+        
+        self.reconstruction_costs_stream.write("{:.3f}\n".format(reconstruction_score))
+        self.reconstruction_costs_stream.flush()
 
     def reports_score(self) -> bool:
         return True
