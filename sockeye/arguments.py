@@ -1367,8 +1367,7 @@ def add_reconstruction_score_args(params):
     add_training_data_args(params, required=False)
     add_vocab_args(params)
     add_device_args(params)
-    add_logging_args(params)
-    add_batch_args(params)
+    add_logging_args(params) # no batch args: batch size = beam size = number of hypotheses in nbest file
     
     rescore_params = params.add_argument_group("Rescoring with reconstruction")
     rescore_params.add_argument("--hypotheses", "-hy",
@@ -1392,10 +1391,12 @@ def add_reconstruction_score_args(params):
                                 type=str,
                                 default=C.OUTPUT_HANDLER_RECONSTRUCTION_SCORE,
                                 help='Print translation and reconstruction costs for n-best list with rescore.py. Default: %(default)s.')
-    rescore_params.add_argument('--reconstruction-costs-file',
-                                type=str,
-                                help='File to print reconstruction costs to. Default: %(default)s.')
+    rescore_params.add_argument("--nbest-nematus",  
+                                default=None,
+                                required=True,
+                                help="File to write nbest list to in nematus format: sentence id ||| hypothesis ||| score. Default: STDOUT.")    
     rescore_params.add_argument("--output", "-o", 
                                 default=None,
-                                help="File to write rescored output to. Format: sentence id || hypothesis || translation score. Reconstruction costs are written to a separate file. Default: STDOUT.")
+                                help="File to write rescored output to. Format: sentence id ||| hypothesis ||| translation score ||| reconstruction score. Default: STDOUT.")
+    
         

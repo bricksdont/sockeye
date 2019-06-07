@@ -24,7 +24,6 @@ from sockeye.utils import plot_attention, print_attention_text, get_alignments
 
 def get_output_handler(output_type: str,
                        output_fname: Optional[str] = None,
-                       reconstruction_costs_file: Optional[str] = None,
                        sure_align_threshold: float = 1.0) -> 'OutputHandler':
     """
 
@@ -36,7 +35,6 @@ def get_output_handler(output_type: str,
     """
     output_stream = sys.stdout if output_fname is None else data_io.smart_open(output_fname, mode='w')
     
-    reconstruction_costs_stream = None if output_type is not C.OUTPUT_HANDLER_RECONSTRUCTION_SCORE else data_io.smart_open(reconstruction_costs_file, mode='w')
     
     if output_type == C.OUTPUT_HANDLER_TRANSLATION:
         return StringOutputHandler(output_stream)
@@ -61,7 +59,9 @@ def get_output_handler(output_type: str,
     elif output_type == C.OUTPUT_HANDLER_NBEST:
         return NBestOutputHandler(output_stream, sure_align_threshold)
     elif output_type == C.OUTPUT_HANDLER_RECONSTRUCTION_SCORE:
-        return ReconstructionScoreOutputHandler(output_stream, reconstruction_costs_stream)
+        return ReconstructionScoreOutputHandler(output_stream)
+    elif output_type == C.OUTPUT_HANDLER_NBEST_NEMATUS_FORMAT:
+        return NBestNematusFormatOutputHandler(output_stream)
     else:
         raise ValueError("unknown output type")
 
@@ -431,19 +431,19 @@ class NBestOutputHandler(OutputHandler):
     def reports_score(self) -> bool:
         return True
 
+
+
 class ReconstructionScoreOutputHandler(OutputHandler):
     """
-    Output handler to write reconstruction rescoring and reconstruction costs (2 files).
+    Output handler to write reconstruction rescoring.
     Output format allows to use the reranking scripts in: https://github.com/pjwilliams/nematus-recon-scripts
-    Reconstruction costs are written to a separate file, given as --reconstruction-costs-file.
 
     :param stream_rescore: Stream to write the rescored nbest list, format is
-    sentence id || hypothesis || translation score.
+    sentence id ||| hypothesis ||| translation score ||| reconstruction score
     """
 
-    def __init__(self, stream_rescore, reconstruction_costs_stream):
+    def __init__(self, stream_rescore):
         self.stream_rescore = stream_rescore
-        self.reconstruction_costs_stream = reconstruction_costs_stream
 
     def handle(self,
                t_input: inference.TranslatorInput,
@@ -454,14 +454,35 @@ class ReconstructionScoreOutputHandler(OutputHandler):
         :param t_input: Translator input.
         :param t_output: Translator output.
         :param reconstruction_score: Reconstruction score.
-        :param reconstruction_costs_file: File to write reconstruction scores to.
         :param t_walltime: Total walltime for translation.
         """
-        self.stream_rescore.write("{} || {} || {:.3f}\n".format(t_output.sentence_id, t_output.translation ,t_output.score))
+        self.stream_rescore.write("{} ||| {} ||| {:.3f} ||| {:.3f} \n".format(t_output.sentence_id, t_output.translation ,t_output.score, reconstruction_score))
         self.stream_rescore.flush()
-        
-        self.reconstruction_costs_stream.write("{:.3f}\n".format(reconstruction_score))
-        self.reconstruction_costs_stream.flush()
+
+    def reports_score(self) -> bool:
+        return True
+    
+class NBestNematusFormatOutputHandler(OutputHandler):
+    """
+    Output handler to write nbest list in nematus format.
+    Output format allows to use the reranking scripts in: https://github.com/pjwilliams/nematus-recon-scripts
+
+    :param stream_nbest: Stream to write the nbest list, format is
+    #sentence id ||| hypothesis ||| translation score.
+    """
+
+    def __init__(self, stream):
+        self.stream = stream
+
+    def handle(self,
+               t_output: inference.TranslatorOutput,
+               t_walltime: float = 0.):
+        """
+        :param t_output: Translator output.
+        :param t_walltime: Total walltime for translation.
+        """
+        self.stream.write("{} ||| {} ||| {:.3f}  \n".format(t_output.sentence_id, t_output.translation ,t_output.score))
+        self.stream.flush()
 
     def reports_score(self) -> bool:
         return True

@@ -237,11 +237,13 @@ class Scorer:
 
     def score(self,
               score_iter,
-              output_handler: OutputHandler):
+              score_output_handler: OutputHandler,
+              nbest_output_handler: OutputHandler):
 
         total_time = 0.
-        sentence_no = 0
-        for i, batch in enumerate(score_iter):
+
+        # since batch size = beam size = number of hypotheses in nbest, batch number = sentence number
+        for sentence_no, batch in enumerate(score_iter):
 
             batch_tic = time.time()
 
@@ -252,14 +254,12 @@ class Scorer:
             total_time += batch_time
 
             # source shape: (beam size, source len, 1) target shape: (beam size, target len, 1)
-            for source, target, target_score, reconstruction_score in zip(batch.data[0], batch.data[1], target_scores, reconstruction_scores):
+            for hyp_no, (source, target, target_score, reconstruction_score) in enumerate(zip(batch.data[0], batch.data[1], target_scores, reconstruction_scores)):
 
                 # The "zeros" padding method will have filled remainder batches with zeros, so we can skip them here
                 if source[0][0] == C.PAD_ID:
                     break
-
-                sentence_no += 1
-
+                
                 # Transform arguments in preparation for printing
                 source_ids = [int(x) for x in source[:, 0].asnumpy().tolist()]
                 source_tokens = list(data_io.ids2tokens(source_ids, self.source_vocab_inv, self.exclude_list))
@@ -269,7 +269,10 @@ class Scorer:
                 target_score = target_score.asscalar()
                 reconstruction_score = reconstruction_score.asscalar()
 
-                output_handler.handle(TranslatorInput(sentence_no, source_tokens),
+                score_output_handler.handle(TranslatorInput(sentence_no, source_tokens),
                                       TranslatorOutput(sentence_no, target_string, None, None, target_score),
                                       reconstruction_score,
                                       batch_time)
+                nbest_output_handler.handle(TranslatorOutput(sentence_no, target_string, None, None, target_score),
+                                      batch_time)
+                

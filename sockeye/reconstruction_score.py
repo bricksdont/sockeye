@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 from contextlib import ExitStack
+from typing import List, Optional, Tuple
 
 from . import arguments
 from . import constants as C
@@ -18,6 +19,7 @@ from . import reconstruction_scoring
 from .output_handler import get_output_handler
 
 logger = log.setup_main_logger(__name__, console=True, file_logging=False)
+
 
 def create_data_iter(args: argparse.Namespace):
     
@@ -36,7 +38,7 @@ def create_data_iter(args: argparse.Namespace):
     source_files = [utils.smart_open(args.source) for source in sources]
     
     with utils.smart_open(args.hypotheses) as hypotheses:
-        for i, (source_line, hypothesis_line) in enumerate(zip(source_files[0], hypotheses), 1):
+        for i, (source_line, hypothesis_line) in enumerate(zip(source_files[0], hypotheses)):
             
             hypotheses = json.loads(hypothesis_line.rstrip())
             utils.check_condition('translations' in hypotheses,
@@ -48,21 +50,20 @@ def create_data_iter(args: argparse.Namespace):
             source_sentences.extend(sources_list)
             target_sentences.extend(hypotheses['translations'])
             
-    
     source_sequence_readers = [data_io.ReconstructionSequenceReader(source_sentences,
                                                                     source_vocabs[0], add_eos=True)]
+    target_sequence_reader = data_io.ReconstructionSequenceReader(target_sentences, target_vocab, add_bos=True)
+    
+    max_source = max([source_sentence.split() for source_sentence in source_sentences], key=len)
+    max_seq_len_source = len(max_source) +1 # <eos>
+    max_target = max([target_sentence.split() for target_sentence in target_sentences], key=len)
+    max_seq_len_target = len(max_target) +1 # <eos>
+    
     if len(sources) > 1:
         factors_sequence_readers = [SequenceReader(source, vocab, add_eos=True) for source,
                                     vocab in zip(sources[1:], source_vocabs[1:])]
         source_sequence_readers.extend(factors_sequence_readers)
         
-    target_sequence_reader = data_io.ReconstructionSequenceReader(target_sentences, target_vocab, add_bos=True)
-        
-    max_source = max(source_sentences, key=len)
-    max_seq_len_source = len(max_source.rstrip().split())
-    max_target = max(target_sentences, key=len)
-    max_seq_len_target = len(max_target.rstrip().split())
-    
     length_statistics = data_io.calculate_length_statistics(source_sequence_readers,
                                                             target_sequence_reader,
                                                             max_seq_len_source,
@@ -78,7 +79,7 @@ def create_data_iter(args: argparse.Namespace):
                                               max_seq_len_target, 
                                               args.bucket_width,
                                               length_statistics.length_ratio_mean) if bucketing else [(max_seq_len_source, max_seq_len_target)]
-        
+    
     data_statistics = data_io.get_data_statistics(source_sequence_readers,
                                                   target_sequence_reader,
                                                   buckets,
@@ -108,9 +109,8 @@ def create_data_iter(args: argparse.Namespace):
                                            permute=False)
             
             
+    return data_iter, source_vocabs, target_vocab          
             
-    return data_iter, source_vocabs, target_vocab
-
 
 def score(args: argparse.Namespace):
     utils.log_basic_info(args)
@@ -120,10 +120,7 @@ def score(args: argparse.Namespace):
                                           disable_device_locking=args.disable_device_locking,
                                           lock_dir=args.lock_dir,
                                           exit_stack=exit_stack)
-        if args.batch_type == C.BATCH_TYPE_SENTENCE:
-            check_condition(args.batch_size % len(context) == 0, "When using multiple devices the batch size must be "
-                                                                 "divisible by the number of devices. Choose a batch "
-                                                                 "size that is a multiple of %d." % len(context))
+
         logger.info("Scoring Device(s): %s", ", ".join(str(c) for c in context))
 
         args.no_bucketing = True
@@ -148,8 +145,9 @@ def score(args: argparse.Namespace):
                                                target_vocab)
         scorer.score(data_iter,
                      get_output_handler(output_type=args.output_type,
-                                        output_fname=args.output,
-                                        reconstruction_costs_file=args.reconstruction_costs_file))
+                                        output_fname=args.output),
+                     get_output_handler(output_type=C.OUTPUT_HANDLER_NBEST_NEMATUS_FORMAT,
+                                        output_fname=args.nbest_nematus))
     
             
             
