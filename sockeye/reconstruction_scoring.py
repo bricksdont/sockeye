@@ -50,7 +50,7 @@ class ReconstructionScoringModel(model.SockeyeModel):
 
     def __init__(self,
                  config: model.ModelConfig,
-                 model_dir: str,
+                 params_fname: str,
                  context: List[mx.context.Context],
                  provide_data: List[mx.io.DataDesc],
                  provide_label: List[mx.io.DataDesc],
@@ -59,6 +59,7 @@ class ReconstructionScoringModel(model.SockeyeModel):
                  score_type: str,
                  softmax_temperature: Optional[float] = None) -> None:
         super().__init__(config)
+        self.params_fname = params_fname
         self.context = context
         self.bucketing = bucketing
         self.score_type = score_type
@@ -68,7 +69,7 @@ class ReconstructionScoringModel(model.SockeyeModel):
         self._initialize(provide_data, provide_label, default_bucket_key)
 
         # Load model parameters into graph
-        params_fname = os.path.join(model_dir, C.PARAMS_BEST_NAME)
+        params_fname = os.path.join(self.params_fname)
         super().load_params_from_file(params_fname)
         self.module.set_params(arg_params=self.params,
                                aux_params=self.aux_params,

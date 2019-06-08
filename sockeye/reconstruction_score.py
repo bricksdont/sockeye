@@ -129,9 +129,14 @@ def score(args: argparse.Namespace):
 
         data_iter, source_vocabs, target_vocab = create_data_iter(args)
         model_config = model.SockeyeModel.load_config(os.path.join(args.model, C.CONFIG_NAME))
+        
+        if args.checkpoint is None:
+            params_fname = os.path.join(args.model, C.PARAMS_BEST_NAME)
+        else:
+            params_fname = os.path.join(args.model, C.PARAMS_NAME % args.checkpoint)
 
         reconstruction_scoring_model = reconstruction_scoring.ReconstructionScoringModel(config=model_config,
-                                                                                         model_dir=args.model,
+                                                                                         params_fname=params_fname,
                                                                                          context=context,
                                                                                          provide_data=data_iter.provide_data,
                                                                                          provide_label=data_iter.provide_label,

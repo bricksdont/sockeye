@@ -1398,5 +1398,8 @@ def add_reconstruction_score_args(params):
     rescore_params.add_argument("--output", "-o", 
                                 default=None,
                                 help="File to write rescored output to. Format: sentence id ||| hypothesis ||| translation score ||| reconstruction score. Default: STDOUT.")
-    
+    rescore_params.add_argument('--checkpoint', '-c',
+                               default=None,
+                               type=int,
+                               help='Use specific checkpoint params for rescoring. If none given, will use params.best. ')
         
