@@ -147,7 +147,8 @@ def score(args: argparse.Namespace):
         
         scorer = reconstruction_scoring.Scorer(reconstruction_scoring_model,
                                                source_vocabs, 
-                                               target_vocab)
+                                               target_vocab,
+                                               r_lambda=args.reconstruction_lambda)
         scorer.score(data_iter,
                      get_output_handler(output_type=args.output_type,
                                         output_fname=args.output),

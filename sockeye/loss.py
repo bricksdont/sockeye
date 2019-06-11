@@ -100,12 +100,13 @@ class CrossEntropyLoss(Loss):
                     loss_config.normalization_type, loss_config.label_smoothing)
         self.loss_config = loss_config
 
-    def get_loss(self, logits: mx.sym.Symbol, labels: mx.sym.Symbol, name: Optional[str] = C.SOFTMAX_NAME) -> List[mx.sym.Symbol]:
+    def get_loss(self, logits: mx.sym.Symbol, labels: mx.sym.Symbol, grad_scale: float = 1.0, name: Optional[str] = C.SOFTMAX_NAME) -> List[mx.sym.Symbol]:
         """
         Returns loss and softmax output symbols given logits and integer-coded labels.
 
         :param logits: Shape: (batch_size * target_seq_len, target_vocab_size).
         :param labels: Shape: (batch_size * target_seq_len,).
+        :param grad_scale: scale by given float (default = 1.0).
         :return: List of loss symbol.
         """
             
@@ -117,6 +118,7 @@ class CrossEntropyLoss(Loss):
             raise ValueError("Unknown loss normalization type: %s" % self.loss_config.normalization_type)
         return [mx.sym.SoftmaxOutput(data=logits,
                                      label=labels,
+                                     grad_scale=grad_scale,
                                      ignore_label=C.PAD_ID,
                                      use_ignore=True,
                                      normalization=normalization,

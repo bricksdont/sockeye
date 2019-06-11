@@ -1076,7 +1076,7 @@ def add_reconstruction_args(params):
                                        default=False,
                                        help='Use a reconstructor to train with additional reconstruction loss. Needs parameters of a trained model to initialize, --params and --allow-missing-params. Default: %(default)s.')
     reconstruction_params.add_argument('--reconstruction-lambda',
-                                       type=int, default=1,
+                                       type=float, default=1.0,
                                        help='Lambda to weigh the reconstruction loss. Default: %(default)s.')
 
 def add_train_cli_args(params):
@@ -1402,4 +1402,6 @@ def add_reconstruction_score_args(params):
                                default=None,
                                type=int,
                                help='Use specific checkpoint params for rescoring. If none given, will use params.best. ')
-        
+    rescore_params.add_argument('--reconstruction-lambda',
+                                       type=float, default=1.0,
+                                       help='Lambda to weigh the reconstruction loss. Default: %(default)s.')

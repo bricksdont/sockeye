@@ -479,11 +479,14 @@ class ReconstructionModel(TrainingModel):
             reconstructed_logits = self.reconstruction_output_layer(reconstructed_sequence)
 
             loss_output = self.model_loss.get_loss(logits, labels)
-            loss_reconstruction_output = self.reconstruction_loss.get_loss(reconstructed_logits, source_labels, name=C.SOFTMAX_RECONSTRUCTION_OUTPUT_NAME)
+            loss_reconstruction_output = self.reconstruction_loss.get_loss(logits=reconstructed_logits, 
+                                                                           labels=source_labels, 
+                                                                           grad_scale=self._r_lambda,
+                                                                           name=C.SOFTMAX_RECONSTRUCTION_OUTPUT_NAME)
             
-            loss_output = loss_output + self._r_lambda * loss_reconstruction_output
+            combined_loss = loss_output + loss_reconstruction_output
 
-            return mx.sym.Group(loss_output), data_names, label_names
+            return mx.sym.Group(combined_loss), data_names, label_names
 
         if self.config.lhuc:
             arguments = sym_gen(default_bucket_key)[0].list_arguments()

@@ -230,11 +230,13 @@ class Scorer:
     def __init__(self,
                  model: ReconstructionScoringModel,
                  source_vocabs: List[vocab.Vocab],
-                 target_vocab: vocab.Vocab) -> None:
+                 target_vocab: vocab.Vocab,
+                 r_lambda: Optional[int] = 1) -> None:
         self.source_vocab_inv = vocab.reverse_vocab(source_vocabs[0])
         self.target_vocab_inv = vocab.reverse_vocab(target_vocab)
         self.model = model
         self.exclude_list = {source_vocabs[0][C.BOS_SYMBOL], target_vocab[C.EOS_SYMBOL], C.PAD_ID}
+        self.r_lambda = r_lambda
 
     def score(self,
               score_iter,
@@ -269,6 +271,7 @@ class Scorer:
                     data_io.ids2tokens(target_ids, self.target_vocab_inv, self.exclude_list))
                 target_score = target_score.asscalar()
                 reconstruction_score = reconstruction_score.asscalar()
+                reconstruction_score *= self.r_lambda
 
                 score_output_handler.handle(TranslatorInput(sentence_no, source_tokens),
                                       TranslatorOutput(sentence_no, target_string, None, None, target_score),
