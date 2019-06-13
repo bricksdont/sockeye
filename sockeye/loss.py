@@ -86,6 +86,13 @@ class Loss(ABC):
         Create an instance of the EvalMetric that corresponds to this Loss function.
         """
         pass
+    
+    @abstractmethod
+    def create_reconstruction_metric(self) -> EvalMetric:
+        """
+        Create an instance of the EvalMetric that corresponds to the reconstruction Loss function.
+        """
+        pass
 
 
 class CrossEntropyLoss(Loss):
@@ -127,7 +134,9 @@ class CrossEntropyLoss(Loss):
 
     def create_metric(self) -> "CrossEntropyMetric":
         return CrossEntropyMetric(self.loss_config)
-
+    
+    def create_reconstruction_metric(self) -> "CrossEntropyMetric":
+        return CrossEntropyMetric(self.loss_config, name=C.RECONSTRUCTION_CROSS_ENTROPY)
 
 class CrossEntropyMetric(EvalMetric):
     """

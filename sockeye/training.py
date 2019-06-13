@@ -396,7 +396,7 @@ class ReconstructionModel(TrainingModel):
                  gradient_compression_params: Optional[Dict[str, Any]] = None,
                  fixed_param_names: Optional[List[str]] = None,
                  r_lambda: Optional[int] = 1) -> None:
-        model.SockeyeModel.__init__(self, config=config)  # TODO: how to call __init__ of grandparent?
+        model.SockeyeModel.__init__(self, config=config)
         self.context = context
         self.output_dir = output_dir
         self.fixed_param_names = fixed_param_names
@@ -428,7 +428,6 @@ class ReconstructionModel(TrainingModel):
         data_names = [C.SOURCE_NAME, C.TARGET_NAME]
         label_names = [C.TARGET_LABEL_NAME]
 
-        # check provide_{data,label} names
         provide_data_names = [d[0] for d in provide_data]
         utils.check_condition(provide_data_names == data_names,
                               "incompatible provide_data: %s, names should be %s" % (provide_data_names, data_names))
@@ -674,6 +673,9 @@ class EarlyStoppingTrainer:
             logger.info("Training started.")
 
         metric_train, metric_val, metric_loss = self._create_metrics(metrics, self.model.optimizer, self.model.loss)
+        metric_reconstruction_loss = None
+        if self.model.config.reconstruction_config_loss is not None:
+            metric_reconstruction_loss = self.model.reconstruction_loss.create_reconstruction_metric()
 
         process_manager = None
         if decoder is not None:
@@ -704,7 +706,7 @@ class EarlyStoppingTrainer:
             # STEP
             ######
             batch = next_data_batch
-            self._step(self.model, batch, checkpoint_frequency, metric_train, metric_loss)
+            self._step(self.model, batch, checkpoint_frequency, metric_train, metric_loss, metric_reconstruction_loss)
             batch_num_samples = batch.data[0].shape[0]
             batch_num_tokens = batch.data[0].shape[1] * batch_num_samples
             self.state.updates += 1
@@ -717,7 +719,7 @@ class EarlyStoppingTrainer:
             next_data_batch = train_iter.next()
             self.model.prepare_batch(next_data_batch)
 
-            speedometer(self.state.epoch, self.state.updates, batch_num_samples, batch_num_tokens, metric_train)
+            speedometer(self.state.epoch, self.state.updates, batch_num_samples, batch_num_tokens, metric_train, metric_reconstruction_loss)
 
             ############
             # CHECKPOINT
@@ -815,7 +817,8 @@ class EarlyStoppingTrainer:
               batch: mx.io.DataBatch,
               checkpoint_frequency: int,
               metric_train: mx.metric.EvalMetric,
-              metric_loss: Optional[mx.metric.EvalMetric] = None):
+              metric_loss: Optional[mx.metric.EvalMetric] = None,
+              metric_reconstruction_loss: Optional[mx.metric.EvalMetric] = None):
         """
         Performs an update to model given a batch and updates metrics.
         """
@@ -855,6 +858,13 @@ class EarlyStoppingTrainer:
             [(_, m_val)] = metric_loss.get_name_value()
             batch_state = BatchState(metric_val=m_val)
             optimizer.pre_update_batch(batch_state)
+            
+        if metric_reconstruction_loss is not None:
+            # Loss for this batch
+            metric_reconstruction_loss.reset()
+            outputs = model.module.get_outputs()
+            metric_reconstruction_loss.update([mx.nd.squeeze(batch.data[0])], [model.module.get_outputs()[1]])
+            
 
         ########
         # UPDATE
@@ -1238,7 +1248,7 @@ class Speedometer:
         self.tokens = 0
         self.msg = 'Epoch[%d] Batch [%d]\tSpeed: %.2f samples/sec %.2f tokens/sec %.2f updates/sec'
 
-    def __call__(self, epoch: int, updates: int, samples: int, tokens: int, metric: Optional[mx.metric.EvalMetric]):
+    def __call__(self, epoch: int, updates: int, samples: int, tokens: int, metric: Optional[mx.metric.EvalMetric], metric_reconstruction: Optional[mx.metric.EvalMetric]):
         count = updates
         if self.last_count > count:
             self.init = False
@@ -1259,7 +1269,14 @@ class Speedometer:
                     name_value = metric.get_name_value()
                     if self.auto_reset:
                         metric.reset()
-                    logger.info(self.msg + '\t%s=%f' * len(name_value),
+                    if metric_reconstruction is not None:  
+                        recon_name_value = metric_reconstruction.get_name_value()
+                        if self.auto_reset:
+                            metric_reconstruction.reset()
+                        logger.info(self.msg + '\t%s=%f' + '\t%s=%f' * len(name_value),
+                                epoch, count, samples_per_sec, tokens_per_sec, updates_per_sec, *sum(name_value, ()), *sum(recon_name_value,()))
+                    else:
+                        logger.info(self.msg + '\t%s=%f' * len(name_value),
                                 epoch, count, samples_per_sec, tokens_per_sec, updates_per_sec, *sum(name_value, ()))
                 else:
                     logger.info(self.msg, epoch, count, samples_per_sec)

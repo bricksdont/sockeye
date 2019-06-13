@@ -117,7 +117,7 @@ def check_arg_compatibility(args: argparse.Namespace):
         check_condition(args.decoder != C.TRANSFORMER_TYPE and args.decoder != C.CONVOLUTION_TYPE,
                         "Decoder pre-training currently supports RNN decoders only.")
         
-    if args.reconstruction: # TODO pytest fails here with AttributeError: 'Namespace' object has no attribute 'reconstruction'...
+    if args.reconstruction: 
         check_condition(args.params != None or not args.allow_missing_parameters,
                         "Need parameter file of a trained model to initialize reconstructor, and need --allow-missing-parameters to continue training with reconstruction loss.")
 
@@ -947,7 +947,7 @@ def train(args: argparse.Namespace) -> training.TrainState:
                                                 max_params_files_to_keep=args.keep_last_params,
                                                 source_vocabs=source_vocabs,
                                                 target_vocab=target_vocab)
-
+        
         training_state = trainer.fit(train_iter=train_iter,
                                      validation_iter=eval_iter,
                                      early_stopping_metric=args.optimized_metric,
