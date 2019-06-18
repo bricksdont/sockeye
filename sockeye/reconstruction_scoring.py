@@ -249,7 +249,8 @@ class Scorer:
         for sentence_no, batch in enumerate(score_iter):
 
             batch_tic = time.time()
-
+            
+            logger.info("Scoring sentence number: {}".format(sentence_no))
             # Run the model and get the outputs
             (target_scores, reconstruction_scores, target_distributions, source_distributions ) = self.model.run(batch)
 
@@ -270,13 +271,15 @@ class Scorer:
                 target_string = C.TOKEN_SEPARATOR.join(
                     data_io.ids2tokens(target_ids, self.target_vocab_inv, self.exclude_list))
                 target_score = target_score.asscalar()
+                normalized_target_score = target_score / len(target_ids)
                 reconstruction_score = reconstruction_score.asscalar()
-                reconstruction_score *= self.r_lambda
+                normalized_reconstruction_score = reconstruction_score / len(source_ids)
+                normalized_reconstruction_score *= self.r_lambda
 
                 score_output_handler.handle(TranslatorInput(sentence_no, source_tokens),
-                                      TranslatorOutput(sentence_no, target_string, None, None, target_score),
-                                      reconstruction_score,
+                                      TranslatorOutput(sentence_no, target_string, None, None, normalized_target_score),
+                                      normalized_reconstruction_score,
                                       batch_time)
-                nbest_output_handler.handle(TranslatorOutput(sentence_no, target_string, None, None, target_score),
+                nbest_output_handler.handle(TranslatorOutput(sentence_no, target_string, None, None, normalized_target_score),
                                       batch_time)
                 

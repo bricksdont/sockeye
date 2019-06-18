@@ -456,7 +456,7 @@ class ReconstructionScoreOutputHandler(OutputHandler):
         :param reconstruction_score: Reconstruction score.
         :param t_walltime: Total walltime for translation.
         """
-        self.stream_rescore.write("{} ||| {} ||| {:.3f} ||| {:.3f} \n".format(t_output.sentence_id, t_output.translation ,t_output.score, reconstruction_score))
+        self.stream_rescore.write("{} ||| {} ||| {:.3f} ||| {:.10f} \n".format(t_output.sentence_id, t_output.translation ,t_output.score, reconstruction_score))
         self.stream_rescore.flush()
 
     def reports_score(self) -> bool:
