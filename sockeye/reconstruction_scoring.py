@@ -240,13 +240,14 @@ class Scorer:
 
     def score(self,
               score_iter,
+              translation_scores,
               score_output_handler: OutputHandler,
-              nbest_output_handler: OutputHandler):
+              nbest_output_handler: Optional[OutputHandler] = None):
 
         total_time = 0.
 
         # since batch size = beam size = number of hypotheses in nbest, batch number = sentence number
-        for sentence_no, batch in enumerate(score_iter):
+        for sentence_no, (batch, t_scores) in enumerate(zip(score_iter, translation_scores)):
 
             batch_tic = time.time()
             
@@ -270,17 +271,17 @@ class Scorer:
                 target_ids = [int(x) for x in target.asnumpy().tolist()]
                 target_string = C.TOKEN_SEPARATOR.join(
                     data_io.ids2tokens(target_ids, self.target_vocab_inv, self.exclude_list))
-                target_score = target_score.asscalar()
-                normalized_target_score = target_score / len(target_string.split())
+                target_score = float(t_scores[hyp_no])
                 
                 reconstruction_score = reconstruction_score.asscalar()
                 normalized_reconstruction_score = reconstruction_score / len(source_tokens)
                 normalized_reconstruction_score *= self.r_lambda
 
                 score_output_handler.handle(TranslatorInput(sentence_no, source_tokens),
-                                      TranslatorOutput(sentence_no, target_string, None, None, normalized_target_score),
+                                      TranslatorOutput(sentence_no, target_string, None, None, target_score),
                                       normalized_reconstruction_score,
                                       batch_time)
-                nbest_output_handler.handle(TranslatorOutput(sentence_no, target_string, None, None, normalized_target_score),
+                if nbest_output_handler is not None:
+                    nbest_output_handler.handle(TranslatorOutput(sentence_no, target_string, None, None, target_score),
                                       batch_time)
                 

@@ -32,6 +32,7 @@ def create_data_iter(args: argparse.Namespace):
     
     source_sentences = []
     target_sentences = []
+    translation_scores = []
     
     bucketing=not args.no_bucketing
     
@@ -49,6 +50,7 @@ def create_data_iter(args: argparse.Namespace):
             
             source_sentences.extend(sources_list)
             target_sentences.extend(hypotheses['translations'])
+            translation_scores.append(hypotheses['scores'])
             
     source_sequence_readers = [data_io.ReconstructionSequenceReader(source_sentences,
                                                                     source_vocabs[0], add_eos=True)]
@@ -109,7 +111,7 @@ def create_data_iter(args: argparse.Namespace):
                                            permute=False)
             
             
-    return data_iter, source_vocabs, target_vocab          
+    return data_iter, source_vocabs, target_vocab, translation_scores          
             
 
 def score(args: argparse.Namespace):
@@ -127,8 +129,9 @@ def score(args: argparse.Namespace):
         args.fill_up = 'zeros'
         logger.info(args)
 
-        data_iter, source_vocabs, target_vocab = create_data_iter(args)
+        data_iter, source_vocabs, target_vocab, translation_scores = create_data_iter(args)
         model_config = model.SockeyeModel.load_config(os.path.join(args.model, C.CONFIG_NAME))
+ 
         
         if args.checkpoint is None:
             params_fname = os.path.join(args.model, C.PARAMS_BEST_NAME)
@@ -149,11 +152,15 @@ def score(args: argparse.Namespace):
                                                source_vocabs, 
                                                target_vocab,
                                                r_lambda=args.reconstruction_lambda)
+        nematus_nbest_output_handler = None
+        if args.nbest_nematus is not None:
+            nematus_nbest_output_handler = get_output_handler(output_type=C.OUTPUT_HANDLER_NBEST_NEMATUS_FORMAT, output_fname=args.nbest_nematus)
+        
         scorer.score(data_iter,
+                     translation_scores,
                      get_output_handler(output_type=args.output_type,
                                         output_fname=args.output),
-                     get_output_handler(output_type=C.OUTPUT_HANDLER_NBEST_NEMATUS_FORMAT,
-                                        output_fname=args.nbest_nematus))
+                     nematus_nbest_output_handler)
     
             
             

@@ -1393,7 +1393,7 @@ def add_reconstruction_score_args(params):
                                 help='Print translation and reconstruction costs for n-best list with rescore.py. Default: %(default)s.')
     rescore_params.add_argument("--nbest-nematus",  
                                 default=None,
-                                required=True,
+                                required=False,
                                 help="File to write nbest list to in nematus format: sentence id ||| hypothesis ||| score. Default: STDOUT.")    
     rescore_params.add_argument("--output", "-o", 
                                 default=None,
