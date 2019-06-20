@@ -113,7 +113,7 @@ class SockeyeModel:
             self.reconstructor = decoder.get_decoder(self.config.config_decoder.reconstructor_config, prefix=self.prefix + "reconstructor_")
 
         # source & target embeddings
-        embed_weight_source, embed_weight_target, out_weight_target = self._get_embed_weights(self.prefix)
+        embed_weight_source, embed_weight_target, out_weight_target, out_weight_source = self._get_embed_weights(self.prefix, self.config.config_decoder.reconstructor_config is not None)
         if isinstance(self.config.config_embed_source, encoder.PassThroughEmbeddingConfig):
             self.embedding_source = encoder.PassThroughEmbedding(self.config.config_embed_source)  # type: encoder.Encoder
         else:
@@ -138,7 +138,7 @@ class SockeyeModel:
         if self.config.config_decoder.reconstructor_config is not None:
             self.reconstruction_output_layer = layers.OutputLayer(hidden_size=self.reconstructor.get_num_hidden(),
                                                vocab_size=self.config.vocab_source_size,
-                                               weight=embed_weight_source, 
+                                               weight=out_weight_source, 
                                                weight_normalization=self.config.weight_normalization,
                                                prefix=self.prefix + "reconstructor_" + C.DEFAULT_OUTPUT_LAYER_PREFIX)
 
@@ -206,13 +206,14 @@ class SockeyeModel:
         with open(fname, "w") as out:
             out.write(__version__)
 
-    def _get_embed_weights(self, prefix: str) -> Tuple[mx.sym.Symbol, mx.sym.Symbol, mx.sym.Symbol]:
+    def _get_embed_weights(self, prefix: str, reconstruction: bool = False) -> Tuple[mx.sym.Symbol, mx.sym.Symbol, mx.sym.Symbol]:
         """
         Returns embedding parameters for source and target.
         When source and target embeddings are shared, they are created here and passed in to each side,
         instead of being created in the Embedding constructors.
 
         :param prefix: Prefix.
+        :reconstruction: Whether this model has a reconstruction output layer.
         :return: Tuple of source and target parameter symbols.
         """
         w_embed_source = mx.sym.Variable(prefix + C.SOURCE_EMBEDDING_PREFIX + "weight",
@@ -224,6 +225,11 @@ class SockeyeModel:
 
         w_out_target = mx.sym.Variable(prefix + "target_output_weight",
                                        shape=(self.config.vocab_target_size, self.decoder.get_num_hidden()))
+        
+        w_out_source = None
+        if reconstruction:
+            w_out_source = mx.sym.Variable(prefix + "reconstructor_target_output_weight",
+                                       shape=(self.config.vocab_source_size, self.decoder.get_num_hidden()))
 
         if self.config.weight_tying:
             if C.WEIGHT_TYING_SRC in self.config.weight_tying_type \
@@ -240,13 +246,18 @@ class SockeyeModel:
                                       "to be equal: %d vs. %d" % (self.config.config_embed_target.num_embed,
                                                                   self.decoder.get_num_hidden()))
                 w_out_target = w_embed_target
+                if reconstruction:
+                    logger.info("Tying the source embeddings and reconstruction output layer parameters.")
+                    w_out_source = w_embed_source
 
         self._embed_weight_source_name = None
         if w_embed_source is not None:
             self._embed_weight_source_name = w_embed_source.name
         self._embed_weight_target_name = w_embed_target.name
         self._out_weight_target_name = w_out_target.name
-        return w_embed_source, w_embed_target, w_out_target
+        if reconstruction:
+            self._out_weight_source_name = w_out_source.name
+        return w_embed_source, w_embed_target, w_out_target, w_out_source
 
     def get_source_embed_params(self) -> Optional[mx.nd.NDArray]:
         if self.params is None:
@@ -262,3 +273,8 @@ class SockeyeModel:
         if self.params is None:
             return None
         return self.params.get(self._out_weight_target_name)
+    
+    def get_reconstruction_output_embed_params(self) -> Optional[mx.nd.NDArray]:
+        if self.params is None:
+            return None
+        return self.params.get(self._out_weight_source_name)
