@@ -17,6 +17,7 @@ from . import data_io
 from . import model
 from . import reconstruction_scoring
 from .output_handler import get_output_handler
+from .utils import check_condition
 
 logger = log.setup_main_logger(__name__, console=True, file_logging=False)
 
@@ -124,6 +125,8 @@ def score(args: argparse.Namespace):
                                           exit_stack=exit_stack)
 
         logger.info("Scoring Device(s): %s", ", ".join(str(c) for c in context))
+        check_condition(args.reconstruction_lambda <= 1.0 and args.reconstruction_lambda >= 0.0,
+                        "Combined loss is calculated as: (1-lambda) * training loss + lambda * reconstruction loss (lambda needs to be => 0.0 and <=1.0)")
 
         args.no_bucketing = True
         args.fill_up = 'zeros'
@@ -157,6 +160,7 @@ def score(args: argparse.Namespace):
             nematus_nbest_output_handler = get_output_handler(output_type=C.OUTPUT_HANDLER_NBEST_NEMATUS_FORMAT, output_fname=args.nbest_nematus)
         
         scorer.score(data_iter,
+                     args.alpha,
                      translation_scores,
                      get_output_handler(output_type=args.output_type,
                                         output_fname=args.output),

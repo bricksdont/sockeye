@@ -231,7 +231,7 @@ class Scorer:
                  model: ReconstructionScoringModel,
                  source_vocabs: List[vocab.Vocab],
                  target_vocab: vocab.Vocab,
-                 r_lambda: Optional[int] = 1) -> None:
+                 r_lambda: Optional[float] = 0.5) -> None:
         self.source_vocab_inv = vocab.reverse_vocab(source_vocabs[0])
         self.target_vocab_inv = vocab.reverse_vocab(target_vocab)
         self.model = model
@@ -240,6 +240,7 @@ class Scorer:
 
     def score(self,
               score_iter,
+              alpha,
               translation_scores,
               score_output_handler: OutputHandler,
               nbest_output_handler: Optional[OutputHandler] = None):
@@ -272,9 +273,11 @@ class Scorer:
                 target_string = C.TOKEN_SEPARATOR.join(
                     data_io.ids2tokens(target_ids, self.target_vocab_inv, self.exclude_list))
                 target_score = float(t_scores[hyp_no])
+                # weighted target score
+                target_score *= (1-self.r_lambda)
                 
                 reconstruction_score = reconstruction_score.asscalar()
-                normalized_reconstruction_score = reconstruction_score / len(source_tokens)
+                normalized_reconstruction_score = reconstruction_score / len(source_tokens)**alpha
                 normalized_reconstruction_score *= self.r_lambda
 
                 score_output_handler.handle(TranslatorInput(sentence_no, source_tokens),

@@ -120,6 +120,9 @@ def check_arg_compatibility(args: argparse.Namespace):
     if args.reconstruction: 
         check_condition(args.params != None or not args.allow_missing_parameters,
                         "Need parameter file of a trained model to initialize reconstructor, and need --allow-missing-parameters to continue training with reconstruction loss.")
+        check_condition(args.reconstruction_lambda <= 1.0 and args.reconstruction_lambda >= 0.0,
+                        "Combined loss is calculated as: (1-lambda) * training loss + lambda * reconstruction loss (lambda needs to be => 0.0 and <=1.0)")
+        
 
 
 def check_resume(args: argparse.Namespace, output_folder: str) -> bool:

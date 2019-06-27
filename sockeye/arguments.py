@@ -1076,8 +1076,8 @@ def add_reconstruction_args(params):
                                        default=False,
                                        help='Use a reconstructor to train with additional reconstruction loss. Needs parameters of a trained model to initialize, --params and --allow-missing-params. Default: %(default)s.')
     reconstruction_params.add_argument('--reconstruction-lambda',
-                                       type=float, default=1.0,
-                                       help='Lambda to weigh the reconstruction loss. Default: %(default)s.')
+                                       type=float, default=0.5,
+                                       help='Lambda to weigh the reconstruction loss (0.0-1.0). Combined loss: (1-lambda) * training loss + lambda * reconstruction loss. Default: %(default)s.')
 
 def add_train_cli_args(params):
     add_training_io_args(params)
@@ -1403,5 +1403,8 @@ def add_reconstruction_score_args(params):
                                type=int,
                                help='Use specific checkpoint params for rescoring. If none given, will use params.best. ')
     rescore_params.add_argument('--reconstruction-lambda',
-                                       type=float, default=1.0,
-                                       help='Lambda to weigh the reconstruction loss. Default: %(default)s.')
+                                type=float, default=0.5,
+                                help='Lambda to weigh the reconstruction loss (0.0-1.0). Combined loss: (1-lambda) * training loss + lambda * reconstruction loss. Default: %(default)s.')
+    rescore_params.add_argument('--alpha',
+                                type=float, default=1.0,
+                                help='Length penalty for normalizing reconstruction scores (Note: this alpha only affects the reconstruction score, the translation score is read from the given nbest file). Default: %(default)s.')

@@ -395,7 +395,7 @@ class ReconstructionModel(TrainingModel):
                  bucketing: bool,
                  gradient_compression_params: Optional[Dict[str, Any]] = None,
                  fixed_param_names: Optional[List[str]] = None,
-                 r_lambda: Optional[int] = 1) -> None:
+                 r_lambda: Optional[float] = 0.5) -> None:
         model.SockeyeModel.__init__(self, config=config)
         self.context = context
         self.output_dir = output_dir
@@ -477,7 +477,9 @@ class ReconstructionModel(TrainingModel):
             logits = self.output_layer(target_decoded)
             reconstructed_logits = self.reconstruction_output_layer(reconstructed_sequence)
 
-            loss_output = self.model_loss.get_loss(logits, labels)
+            loss_output = self.model_loss.get_loss(logits=logits,
+                                                   labels=labels,
+                                                   grad_scale=1.0-self._r_lambda)
             loss_reconstruction_output = self.reconstruction_loss.get_loss(logits=reconstructed_logits, 
                                                                            labels=source_labels, 
                                                                            grad_scale=self._r_lambda,
