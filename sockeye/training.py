@@ -459,13 +459,16 @@ class ReconstructionModel(TrainingModel):
              source_encoded_seq_len) = self.encoder.encode(source_embed,
                                                            source_embed_length,
                                                            source_embed_seq_len)
+            embed_bos = target_embed.slice_axis(axis=1, begin=0, end=1)
+            source_embed_full = source_embed.slice_axis(axis=1, begin=0, end=-1)
+            source_embed_bos = mx.sym.concat(embed_bos, source_embed_full, dim=1)
 
             # decoder
             # target_decoded: (batch-size, target_len, decoder_depth)
             target_decoded = self.decoder.decode_sequence(source_encoded, source_encoded_length, source_encoded_seq_len,
                                                           target_embed, target_embed_length, target_embed_seq_len)
             reconstructed_sequence = self.reconstructor.decode_sequence(target_decoded, target_embed_length, target_embed_seq_len,
-                                                          source_embed, source_embed_length, source_embed_seq_len)
+                                                          source_embed_bos, source_embed_length, source_embed_seq_len)
 
             # target_decoded: (batch_size * target_seq_len, decoder_depth)
             target_decoded = mx.sym.reshape(data=target_decoded, shape=(-3, 0))
