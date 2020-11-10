@@ -966,6 +966,26 @@ class Translator:
         return source, source_length, restrict_lexicon, raw_constraints, raw_avoid_list, \
                 mx.nd.array(max_output_lengths, ctx=self.context, dtype='int32')
 
+    def index_to_token(self,
+                       vocab: vocab.InverseVocab,
+                       index: int) -> str:
+        """
+        Temporary workaround for sampling bug, see
+        https://github.com/awslabs/sockeye/issues/866
+        https://github.com/apache/incubator-mxnet/issues/19073
+
+        :param vocab: one inverse target vocabulary (of possibly several)
+        :param index: target vocabulary index
+        :return: target token as string
+        """
+
+        try:
+            token = vocab[index]
+        except IndexError:
+            token = C.UNK_SYMBOL
+
+        return token
+
     def _get_translation_tokens_and_factors(self, target_ids: List[List[int]]) -> Tuple[List[str],
                                                                                         str,
                                                                                         List[List[str]],
@@ -983,7 +1003,7 @@ class Translator:
         pruned_target_ids = (tokens for tokens in target_ids if not tokens[0] in self.strip_ids)
         for factor_index, factor_sequence in enumerate(zip(*pruned_target_ids)):
             vocab_target_inv = self.vocab_targets_inv[factor_index]
-            target_tokens = [vocab_target_inv[target_id] for target_id in factor_sequence]
+            target_tokens = [self.index_to_token(vocab_target_inv, target_id) for target_id in factor_sequence]
             target_string = C.TOKEN_SEPARATOR.join(target_tokens)
             all_target_tokens.append(target_tokens)
             all_target_strings.append(target_string)
