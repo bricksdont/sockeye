@@ -981,7 +981,7 @@ class Translator:
 
         try:
             token = vocab[index]
-        except IndexError:
+        except KeyError:
             token = C.UNK_SYMBOL
 
         return token
